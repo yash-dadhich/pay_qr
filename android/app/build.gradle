@@ -3,11 +3,34 @@ plugins {
     id "kotlin-android"
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
+    // Firebase plugin - enables all Firebase services
+    id "com.google.gms.google-services"
 }
 
 android {
 
-    namespace = "com.payqr.pay_qr"
+    // Enable App Bundle for better size optimization
+    bundle {
+        language {
+            enableSplit = true
+        }
+        density {
+            enableSplit = true
+        }
+        abi {
+            enableSplit = true
+        }
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('/Users/ravi/Desktop/yash/Self/pay_qr/android/keystore')
+            storePassword 'android'
+            keyAlias 'android'
+            keyPassword 'android'
+        }
+    }
+    namespace = "com.sylionixtech.payqr"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
     compileSdk = 35
@@ -23,13 +46,18 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.payqr.pay_qr"
+        applicationId = "com.sylionixtech.payqr"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        targetSdk = 35
+        versionCode = 2
+        versionName = '1.0.0'
+        
+        // Enable split APKs for different architectures
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
     }
 
     buildTypes {
@@ -37,8 +65,24 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.debug
+            
+            // Enable code shrinking and obfuscation
+            minifyEnabled true
+            shrinkResources true
+            
+            // Use R8 for better optimization
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        
+        debug {
+            // Disable optimization for faster builds
+            minifyEnabled false
+            shrinkResources false
         }
     }
+
+
+
 }
 
 flutter {

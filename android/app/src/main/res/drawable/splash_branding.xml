@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="60dp"
+    android:viewportWidth="200"
+    android:viewportHeight="60">
+    
+    <!-- Simple text representation for "Pay QR" -->
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M20,20h8v20h-8z" />
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M24,20h8v20h-8z" />
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M28,20h8v20h-8z" />
+    
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M40,20h8v20h-8z" />
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M44,20h8v20h-8z" />
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M48,20h8v20h-8z" />
+    
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M60,20h8v20h-8z" />
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M64,20h8v20h-8z" />
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M68,20h8v20h-8z" />
+</vector>

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "51993287031",
+    "project_id": "pay-qr-app",
+    "storage_bucket": "pay-qr-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:51993287031:android:e8a0125b2039b46fa22972",
+        "android_client_info": {
+          "package_name": "com.sylionixtech.payqr"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB6qJbASj5Sy9cBs6gbD3rDPD13Bb-Z5bQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
