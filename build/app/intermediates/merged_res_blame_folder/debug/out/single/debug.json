@@ -1,26 +1,38 @@
 [
     {
-        "merged": "com.payqr.pay_qr.app-merged_res-26:/mipmap-xhdpi_ic_launcher.png.flat",
-        "source": "com.payqr.pay_qr.app-main-21:/mipmap-xhdpi/ic_launcher.png"
+        "merged": "com.sylionixtech.payqr.app-merged_res-45:/mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "com.sylionixtech.payqr.app-main-39:/mipmap-xxxhdpi/ic_launcher.png"
     },
     {
-        "merged": "com.payqr.pay_qr.app-merged_res-26:/mipmap-hdpi_ic_launcher.png.flat",
-        "source": "com.payqr.pay_qr.app-main-21:/mipmap-hdpi/ic_launcher.png"
+        "merged": "com.sylionixtech.payqr.app-merged_res-45:/mipmap-mdpi_ic_launcher.png.flat",
+        "source": "com.sylionixtech.payqr.app-main-39:/mipmap-mdpi/ic_launcher.png"
     },
     {
-        "merged": "com.payqr.pay_qr.app-merged_res-26:/mipmap-xxxhdpi_ic_launcher.png.flat",
-        "source": "com.payqr.pay_qr.app-main-21:/mipmap-xxxhdpi/ic_launcher.png"
+        "merged": "com.sylionixtech.payqr.app-merged_res-45:/mipmap-xxhdpi_ic_launcher.png.flat",
+        "source": "com.sylionixtech.payqr.app-main-39:/mipmap-xxhdpi/ic_launcher.png"
     },
     {
-        "merged": "com.payqr.pay_qr.app-merged_res-26:/drawable-v21_launch_background.xml.flat",
-        "source": "com.payqr.pay_qr.app-main-21:/drawable-v21/launch_background.xml"
+        "merged": "com.sylionixtech.payqr.app-merged_res-45:/drawable_splash_icon.xml.flat",
+        "source": "com.sylionixtech.payqr.app-main-39:/drawable/splash_icon.xml"
     },
     {
-        "merged": "com.payqr.pay_qr.app-merged_res-26:/mipmap-xxhdpi_ic_launcher.png.flat",
-        "source": "com.payqr.pay_qr.app-main-21:/mipmap-xxhdpi/ic_launcher.png"
+        "merged": "com.sylionixtech.payqr.app-merged_res-45:/mipmap-hdpi_ic_launcher.png.flat",
+        "source": "com.sylionixtech.payqr.app-main-39:/mipmap-hdpi/ic_launcher.png"
     },
     {
-        "merged": "com.payqr.pay_qr.app-merged_res-26:/mipmap-mdpi_ic_launcher.png.flat",
-        "source": "com.payqr.pay_qr.app-main-21:/mipmap-mdpi/ic_launcher.png"
+        "merged": "com.sylionixtech.payqr.app-merged_res-45:/drawable_splash_branding.xml.flat",
+        "source": "com.sylionixtech.payqr.app-main-39:/drawable/splash_branding.xml"
+    },
+    {
+        "merged": "com.sylionixtech.payqr.app-merged_res-45:/drawable-night_launch_background.xml.flat",
+        "source": "com.sylionixtech.payqr.app-main-39:/drawable-night/launch_background.xml"
+    },
+    {
+        "merged": "com.sylionixtech.payqr.app-merged_res-45:/drawable-v21_launch_background.xml.flat",
+        "source": "com.sylionixtech.payqr.app-main-39:/drawable-v21/launch_background.xml"
+    },
+    {
+        "merged": "com.sylionixtech.payqr.app-merged_res-45:/mipmap-xhdpi_ic_launcher.png.flat",
+        "source": "com.sylionixtech.payqr.app-main-39:/mipmap-xhdpi/ic_launcher.png"
     }
 ]

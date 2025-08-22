@@ -4,7 +4,7 @@
     "type": "COMPATIBLE_SCREEN_MANIFEST",
     "kind": "Directory"
   },
-  "applicationId": "com.payqr.pay_qr",
+  "applicationId": "com.sylionixtech.payqr",
   "variantName": "debug",
   "elements": []
 }

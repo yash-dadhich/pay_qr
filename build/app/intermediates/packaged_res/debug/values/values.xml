@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="splash_background">#FFFFFF</color>
+    <string name="gcm_defaultSenderId" translatable="false">51993287031</string>
+    <string name="google_api_key" translatable="false">AIzaSyB6qJbASj5Sy9cBs6gbD3rDPD13Bb-Z5bQ</string>
+    <string name="google_app_id" translatable="false">1:51993287031:android:e8a0125b2039b46fa22972</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyB6qJbASj5Sy9cBs6gbD3rDPD13Bb-Z5bQ</string>
+    <string name="google_storage_bucket" translatable="false">pay-qr-app.firebasestorage.app</string>
+    <string name="project_id" translatable="false">pay-qr-app</string>
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         
         <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
     </style>
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
