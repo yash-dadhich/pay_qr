@@ -4,7 +4,7 @@
             "outputFile": "com.payqr.pay_qr.app-mergeDebugResources-24:/values-night-v8/values-night-v8.xml",
             "map": [
                 {
-                    "source": "/Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/res/values-night/styles.xml",
+                    "source": "/Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/res/values-night/styles.xml",
                     "from": {
                         "startLines": "3,14",
                         "startColumns": "4,4",

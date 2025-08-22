@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 application
-INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/AndroidManifest.xml:2:5-33:19
-INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml
-MERGED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:7:5-33:19
-MERGED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:7:5-33:19
+INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/AndroidManifest.xml:2:5-33:19
+INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml
+MERGED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:7:5-33:19
+MERGED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:7:5-33:19
 MERGED from [androidx.window:window:1.2.0] /Users/ravi/.gradle/caches/transforms-3/3e108fe9d597d03770ae82acaebb5b63/transformed/jetified-window-1.2.0/AndroidManifest.xml:22:5-29:19
 MERGED from [androidx.window:window:1.2.0] /Users/ravi/.gradle/caches/transforms-3/3e108fe9d597d03770ae82acaebb5b63/transformed/jetified-window-1.2.0/AndroidManifest.xml:22:5-29:19
 MERGED from [androidx.core:core:1.13.1] /Users/ravi/.gradle/caches/transforms-3/c666c258fca39b3353b46678a6b928ab/transformed/core-1.13.1/AndroidManifest.xml:28:5-89
@@ -17,20 +17,20 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/ravi/.gradle/caches/
 MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/ravi/.gradle/caches/transforms-3/ee01e2b20f52029a052c42ac95f9e8b2/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
 MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/ravi/.gradle/caches/transforms-3/ee01e2b20f52029a052c42ac95f9e8b2/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
 	android:extractNativeLibs
-		INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml
+		INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.13.1] /Users/ravi/.gradle/caches/transforms-3/c666c258fca39b3353b46678a6b928ab/transformed/core-1.13.1/AndroidManifest.xml:28:18-86
 	android:name
-		INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/AndroidManifest.xml
+		INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/AndroidManifest.xml
 manifest
-ADDED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/AndroidManifest.xml:1:1-45:12
-MERGED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/AndroidManifest.xml:1:1-45:12
-INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml:1:1-7:12
-INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml:1:1-7:12
-INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml:1:1-7:12
-MERGED from [:path_provider_android] /Users/ravi/Desktop/yash/Self/pay_qr/build/path_provider_android/intermediates/merged_manifest/debug/AndroidManifest.xml:2:1-7:12
-MERGED from [:permission_handler_android] /Users/ravi/Desktop/yash/Self/pay_qr/build/permission_handler_android/intermediates/merged_manifest/debug/AndroidManifest.xml:2:1-7:12
-MERGED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:2:1-35:12
+ADDED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/AndroidManifest.xml:1:1-45:12
+MERGED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/AndroidManifest.xml:1:1-45:12
+INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml:1:1-7:12
+INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml:1:1-7:12
+INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml:1:1-7:12
+MERGED from [:path_provider_android] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/path_provider_android/intermediates/merged_manifest/debug/AndroidManifest.xml:2:1-7:12
+MERGED from [:permission_handler_android] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/permission_handler_android/intermediates/merged_manifest/debug/AndroidManifest.xml:2:1-7:12
+MERGED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:2:1-35:12
 MERGED from [androidx.fragment:fragment:1.7.1] /Users/ravi/.gradle/caches/transforms-3/a49cd171355a6a39687e69f028c8bcbc/transformed/fragment-1.7.1/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.window:window:1.2.0] /Users/ravi/.gradle/caches/transforms-3/3e108fe9d597d03770ae82acaebb5b63/transformed/jetified-window-1.2.0/AndroidManifest.xml:17:1-31:12
 MERGED from [androidx.window:window-java:1.2.0] /Users/ravi/.gradle/caches/transforms-3/bf78d940cc78ca45c77421e3af64376e/transformed/jetified-window-java-1.2.0/AndroidManifest.xml:17:1-21:12
@@ -57,39 +57,39 @@ MERGED from [androidx.interpolator:interpolator:1.0.0] /Users/ravi/.gradle/cache
 MERGED from [androidx.window.extensions.core:core:1.0.0] /Users/ravi/.gradle/caches/transforms-3/6dde453803d512b3f23cc981e264e9e0/transformed/jetified-core-1.0.0/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.annotation:annotation-experimental:1.4.0] /Users/ravi/.gradle/caches/transforms-3/6707c561045b071954f9f1d8398a2530/transformed/jetified-annotation-experimental-1.4.0/AndroidManifest.xml:2:1-7:12
 	package
-		INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml
+		INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml
 	android:versionName
-		INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml
+		INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml
 	android:versionCode
-		INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml
+		INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml
 	xmlns:android
-		ADDED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/AndroidManifest.xml:1:11-69
+		ADDED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/AndroidManifest.xml:1:11-69
 queries
-ADDED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/AndroidManifest.xml:39:5-44:15
+ADDED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/AndroidManifest.xml:39:5-44:15
 intent#action:name:android.intent.action.PROCESS_TEXT+data:mimeType:text/plain
-ADDED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/AndroidManifest.xml:40:9-43:18
+ADDED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/AndroidManifest.xml:40:9-43:18
 action#android.intent.action.PROCESS_TEXT
-ADDED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/AndroidManifest.xml:41:13-72
+ADDED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/AndroidManifest.xml:41:13-72
 	android:name
-		ADDED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/AndroidManifest.xml:41:21-70
+		ADDED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/AndroidManifest.xml:41:21-70
 data
-ADDED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/AndroidManifest.xml:42:13-50
+ADDED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/AndroidManifest.xml:42:13-50
 	android:mimeType
-		ADDED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/main/AndroidManifest.xml:42:19-48
+		ADDED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/main/AndroidManifest.xml:42:19-48
 uses-permission#android.permission.INTERNET
-ADDED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml:6:5-66
+ADDED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml:6:5-66
 	android:name
-		ADDED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml:6:22-64
+		ADDED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml:6:22-64
 uses-sdk
-INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml reason: use-sdk injection requested
-INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml
-INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml
-MERGED from [:path_provider_android] /Users/ravi/Desktop/yash/Self/pay_qr/build/path_provider_android/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
-MERGED from [:path_provider_android] /Users/ravi/Desktop/yash/Self/pay_qr/build/path_provider_android/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
-MERGED from [:permission_handler_android] /Users/ravi/Desktop/yash/Self/pay_qr/build/permission_handler_android/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
-MERGED from [:permission_handler_android] /Users/ravi/Desktop/yash/Self/pay_qr/build/permission_handler_android/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
-MERGED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
-MERGED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
+INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml
+INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml
+MERGED from [:path_provider_android] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/path_provider_android/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
+MERGED from [:path_provider_android] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/path_provider_android/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
+MERGED from [:permission_handler_android] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/permission_handler_android/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
+MERGED from [:permission_handler_android] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/permission_handler_android/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
+MERGED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
+MERGED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:5:5-44
 MERGED from [androidx.fragment:fragment:1.7.1] /Users/ravi/.gradle/caches/transforms-3/a49cd171355a6a39687e69f028c8bcbc/transformed/fragment-1.7.1/AndroidManifest.xml:5:5-44
 MERGED from [androidx.fragment:fragment:1.7.1] /Users/ravi/.gradle/caches/transforms-3/a49cd171355a6a39687e69f028c8bcbc/transformed/fragment-1.7.1/AndroidManifest.xml:5:5-44
 MERGED from [androidx.window:window:1.2.0] /Users/ravi/.gradle/caches/transforms-3/3e108fe9d597d03770ae82acaebb5b63/transformed/jetified-window-1.2.0/AndroidManifest.xml:20:5-44
@@ -141,37 +141,37 @@ MERGED from [androidx.window.extensions.core:core:1.0.0] /Users/ravi/.gradle/cac
 MERGED from [androidx.annotation:annotation-experimental:1.4.0] /Users/ravi/.gradle/caches/transforms-3/6707c561045b071954f9f1d8398a2530/transformed/jetified-annotation-experimental-1.4.0/AndroidManifest.xml:5:5-44
 MERGED from [androidx.annotation:annotation-experimental:1.4.0] /Users/ravi/.gradle/caches/transforms-3/6707c561045b071954f9f1d8398a2530/transformed/jetified-annotation-experimental-1.4.0/AndroidManifest.xml:5:5-44
 	android:targetSdkVersion
-		INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml
+		INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml
 	android:minSdkVersion
-		INJECTED from /Users/ravi/Desktop/yash/Self/pay_qr/android/app/src/debug/AndroidManifest.xml
+		INJECTED from /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/android/app/src/debug/AndroidManifest.xml
 provider#dev.fluttercommunity.plus.share.ShareFileProvider
-ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:13:9-21:20
+ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:13:9-21:20
 	android:grantUriPermissions
-		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:17:13-47
+		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:17:13-47
 	android:authorities
-		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:15:13-74
+		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:15:13-74
 	android:exported
-		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:16:13-37
+		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:16:13-37
 	android:name
-		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:14:13-77
+		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:14:13-77
 meta-data#android.support.FILE_PROVIDER_PATHS
-ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:18:13-20:68
+ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:18:13-20:68
 	android:resource
-		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:20:17-65
+		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:20:17-65
 	android:name
-		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:19:17-67
+		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:19:17-67
 receiver#dev.fluttercommunity.plus.share.SharePlusPendingIntent
-ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:26:9-32:20
+ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:26:9-32:20
 	android:exported
-		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:28:13-37
+		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:28:13-37
 	android:name
-		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:27:13-82
+		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:27:13-82
 intent-filter#action:name:EXTRA_CHOSEN_COMPONENT
-ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:29:13-31:29
+ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:29:13-31:29
 action#EXTRA_CHOSEN_COMPONENT
-ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:30:17-65
+ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:30:17-65
 	android:name
-		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:30:25-62
+		ADDED from [:share_plus] /Users/ravi/Desktop/yash/Self/PayQR/pay_qr/build/share_plus/intermediates/merged_manifest/debug/AndroidManifest.xml:30:25-62
 uses-library#androidx.window.extensions
 ADDED from [androidx.window:window:1.2.0] /Users/ravi/.gradle/caches/transforms-3/3e108fe9d597d03770ae82acaebb5b63/transformed/jetified-window-1.2.0/AndroidManifest.xml:23:9-25:40
 	android:required
