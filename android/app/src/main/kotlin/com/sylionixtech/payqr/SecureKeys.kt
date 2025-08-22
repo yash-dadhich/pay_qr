@@ -25,8 +25,8 @@ class SecureKeys private constructor() {
             }
         }
         
-        // Encryption key (obfuscated)
-        private const val ENCRYPTION_KEY = "K8x#mP2$vL9nQ4@jR7wE5&hF3sA6"
+        // Encryption key (obfuscated) - using a simpler key to avoid compilation issues
+        private const val ENCRYPTION_KEY = "K8xmP2vL9nQ4jR7wE5hF3sA6"
         
         // Obfuscated AdMob keys (split and encoded)
         // Your REAL AdMob App ID: ca-app-pub-2438390987655762~7343872589
@@ -119,8 +119,13 @@ class SecureKeys private constructor() {
                 PackageManager.GET_SIGNATURES
             )
             
-            // Get the first signature
-            val signature = packageInfo.signatures[0]
+            // Get the first signature - fix nullable array access
+            val signatures = packageInfo.signatures
+            if (signatures.isNullOrEmpty()) {
+                return false
+            }
+            
+            val signature = signatures[0]
             val signatureHash = MessageDigest.getInstance("SHA-256")
                 .digest(signature.toByteArray())
                 .joinToString("") { "%02x".format(it) }
