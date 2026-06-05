@@ -8,81 +8,64 @@ plugins {
 }
 
 android {
+    namespace = "com.sylionixtech.payqr"
+    compileSdk = 35
+    ndkVersion = flutter.ndkVersion
 
-    // Enable App Bundle for better size optimization
-    bundle {
-        language {
-            enableSplit = true
-        }
-        density {
-            enableSplit = true
-        }
-        abi {
-            enableSplit = true
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    defaultConfig {
+        applicationId = "com.sylionixtech.payqr"
+        minSdk = flutter.minSdkVersion
+        targetSdk = 36
+        versionCode = 3
+        versionName = '1.0.0'
+
+        // Enable split APKs for different architectures
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
         }
     }
 
     signingConfigs {
         release {
-            storeFile file('/Users/ravi/Desktop/yash/Self/pay_qr/android/keystore')
+            // Keystore is at android/keystore in the project root
+            storeFile file('../keystore')
             storePassword 'android'
             keyAlias 'android'
             keyPassword 'android'
         }
     }
-    namespace = "com.sylionixtech.payqr"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
-    compileSdk = 35
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
-    }
-
-    defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.sylionixtech.payqr"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = 35
-        versionCode = 2
-        versionName = '1.0.0'
-        
-        // Enable split APKs for different architectures
-        ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
-        }
-    }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
-            
+            signingConfig = signingConfigs.release
+
             // Enable code shrinking and obfuscation
             minifyEnabled true
             shrinkResources true
-            
-            // Use R8 for better optimization
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
-        
+
         debug {
-            // Disable optimization for faster builds
             minifyEnabled false
             shrinkResources false
         }
     }
 
-
-
+    // Enable App Bundle splits
+    bundle {
+        language { enableSplit = true }
+        density { enableSplit = true }
+        abi { enableSplit = true }
+    }
 }
 
 flutter {

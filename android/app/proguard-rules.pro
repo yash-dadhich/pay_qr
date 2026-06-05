@@ -6,6 +6,12 @@
 -keep class io.flutter.**  { *; }
 -keep class io.flutter.plugins.**  { *; }
 
+# Flutter Play Store deferred components — not used in this app but referenced
+# by Flutter engine internals. Tell R8 to ignore missing Play Core classes.
+-dontwarn com.google.android.play.core.splitcompat.SplitCompatApplication
+-dontwarn com.google.android.play.core.splitinstall.**
+-dontwarn com.google.android.play.core.tasks.**
+
 # Firebase rules
 -keep class com.google.firebase.** { *; }
 -keep class com.google.android.gms.** { *; }
