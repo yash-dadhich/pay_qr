@@ -1,7 +1,6 @@
-import 'dart:ui';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -18,110 +17,110 @@ import 'services/secure_admob_service.dart';
 import 'widgets/force_update_dialog.dart';
 import 'widgets/maintenance_mode_screen.dart';
 
-// TODO: Replace 'assets/splash_animation.json' with your actual Lottie file path
-// Place your Lottie file in the assets folder and update the path below
+// ─── Theme ────────────────────────────────────────────────────────────────────
+const _bg = Color(0xFFF5F0EB);
+const _card = Colors.white;
+const _primary = Color(0xFF1A1A2E);   // near-black for text / appbar
+const _accent = Color(0xFFC8922A);    // gold / amber accent
+const _textSub = Color(0xFF888888);
+const _divider = Color(0xFFE8E0D8);
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Firebase first (Power Switch)
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+  ));
+
   final firebaseService = Get.put(FirebaseService());
   await firebaseService.initialize();
-  
-  // Initialize other services
   await GetStorage.init();
-  
-  // Set test device IDs here
-  // await MobileAds.instance.updateRequestConfiguration(
-  //   RequestConfiguration(testDeviceIds: ['ca-app-pub-3940256099942544/5224354917']),
-  // );
-  MobileAds.instance.initialize(); // Initialize Google Mobile Ads SDK
-  
+  MobileAds.instance.initialize();
+
   runApp(const MyApp());
 }
 
+// ─── App ──────────────────────────────────────────────────────────────────────
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return GetMaterialApp(
+      title: 'Pay QR',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        scaffoldBackgroundColor: _bg,
+        fontFamily: GoogleFonts.poppins().fontFamily,
+        colorScheme: ColorScheme.light(
+          primary: _primary,
+          secondary: _accent,
+        ),
+      ),
+      home: const SplashScreen(),
+    );
+  }
+}
+
+// ─── Splash ───────────────────────────────────────────────────────────────────
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
-
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
-  late AnimationController _animationController;
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
+  late AnimationController _ctrl;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
+    _ctrl = AnimationController(
       duration: const Duration(seconds: 3),
       vsync: this,
     );
-
     _startAnimation();
   }
 
   void _startAnimation() async {
-    // Start Lottie animation
-    _animationController.forward();
-    
-    // Wait for animation to complete
+    _ctrl.forward();
     await Future.delayed(const Duration(seconds: 3));
-    
-    logDebug('Splash animation completed, checking Firebase...');
-    
-    // Check for maintenance mode first
-    final firebaseService = Get.find<FirebaseService>();
-    
-    logDebug('Checking maintenance mode...');
-    logDebug('isMaintenanceMode: ${firebaseService.isMaintenanceMode}');
-    
-    if (firebaseService.isMaintenanceMode) {
-      logDebug('Maintenance mode active, showing maintenance screen');
-      // Show maintenance mode screen
+    final svc = Get.find<FirebaseService>();
+    if (svc.isMaintenanceMode) {
       Get.off(() => const MaintenanceModeScreen());
+    } else if (svc.isForceUpdateRequired.value) {
+      Get.dialog(const ForceUpdateDialog(), barrierDismissible: false);
     } else {
-      logDebug('No maintenance mode, checking force update...');
-      logDebug('isForceUpdateRequired: ${firebaseService.isForceUpdateRequired.value}');
-      
-      if (firebaseService.isForceUpdateRequired.value) {
-        logDebug('Force update required, showing dialog');
-        // Show force update dialog
-        Get.dialog(
-          const ForceUpdateDialog(),
-          barrierDismissible: false,
-        );
-      } else {
-        logDebug('No force update required, continuing to main app');
-        // Navigate to main app
-        Get.off(() => const UpiQrGenerator());
-      }
+      Get.off(() => const HomeScreen());
     }
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Lottie.asset(
-        'assets/splash_animation.json',
-        controller: _animationController,
-        onLoaded: (composition) {
-          _animationController.duration = composition.duration;
-        },
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
+      backgroundColor: _bg,
+      body: Center(
+        child: Lottie.asset(
+          'assets/splash_animation.json',
+          controller: _ctrl,
+          onLoaded: (c) => _ctrl.duration = c.duration,
+          fit: BoxFit.contain,
+          width: 240,
+        ),
       ),
     );
   }
 }
 
+// ─── Controller ───────────────────────────────────────────────────────────────
 class UpiController extends GetxController {
   final box = GetStorage();
   final screenshotController = ScreenshotController();
@@ -133,28 +132,24 @@ class UpiController extends GetxController {
   final amountController = TextEditingController();
   final splitController = TextEditingController(text: '1');
 
-  // Rewarded Ad
   RewardedAd? rewardedAd;
   var isAdReady = false.obs;
 
   @override
   void onInit() {
     super.onInit();
-
     final stored = box.read<List<dynamic>>('upiIds');
-    if (stored != null) upiIds.assignAll(stored.map((e) => Map<String, String>.from(e)));
-
+    if (stored != null) {
+      upiIds.assignAll(stored.map((e) => Map<String, String>.from(e)));
+    }
     final selected = box.read<Map<String, dynamic>>('selectedUpi');
-    if (selected != null) selectedUpi.value = selected.map((k, v) => MapEntry(k, v.toString()));
-
-    amountController.addListener(() {
-      amount.value = double.tryParse(amountController.text) ?? 0.0;
-    });
-
-    splitController.addListener(() {
-      split.value = int.tryParse(splitController.text) ?? 1;
-    });
-
+    if (selected != null) {
+      selectedUpi.value = selected.map((k, v) => MapEntry(k, v.toString()));
+    }
+    amountController.addListener(
+        () => amount.value = double.tryParse(amountController.text) ?? 0.0);
+    splitController.addListener(
+        () => split.value = int.tryParse(splitController.text) ?? 1);
     _loadRewardedAd();
   }
 
@@ -163,871 +158,1242 @@ class UpiController extends GetxController {
     box.write('selectedUpi', selectedUpi.value);
   }
 
-  void addNewUpi(String upiId, String name) {
+  bool addNewUpi(String upiId, String name) {
     if (upiIds.any((e) => e['upiId'] == upiId)) {
-      Get.snackbar("Warning", "UPI ID already exists");
-      return;
+      Get.snackbar('Warning', 'UPI ID already exists',
+          backgroundColor: Colors.orange[100],
+          colorText: Colors.orange[900],
+          snackPosition: SnackPosition.BOTTOM);
+      return false;
     }
-    final newUpi = {'upiId': upiId, 'name': name};
-    upiIds.add(newUpi);
-    selectedUpi.value = newUpi;
+    final entry = {'upiId': upiId, 'name': name};
+    upiIds.add(entry);
+    selectedUpi.value = entry;
     saveData();
+    return true;
+  }
+
+  bool editUpi(Map<String, String> oldUpi, String newUpiId, String newName) {
+    final idx = upiIds.indexOf(oldUpi);
+    if (idx == -1) return false;
+    if (newUpiId != oldUpi['upiId'] &&
+        upiIds.any((e) => e['upiId'] == newUpiId)) {
+      Get.snackbar('Warning', 'UPI ID already exists',
+          backgroundColor: Colors.orange[100],
+          colorText: Colors.orange[900],
+          snackPosition: SnackPosition.BOTTOM);
+      return false;
+    }
+    final updated = {'upiId': newUpiId, 'name': newName};
+    upiIds[idx] = updated;
+    if (selectedUpi.value == oldUpi) selectedUpi.value = updated;
+    saveData();
+    return true;
   }
 
   void deleteUpi(Map<String, String> upi) {
-    upiIds.remove(upi);
-    if (selectedUpi.value == upi) {
-      selectedUpi.value = null;
-      // If this was the last UPI, close the dialog
-      if (upiIds.isEmpty) {
-        Get.back();
-      }
-    }
-    saveData();
+    Get.dialog(
+      _ConfirmDialog(
+        title: 'Delete UPI ID',
+        message:
+            'Remove "${upi['name']}" (${upi['upiId']})?\nThis cannot be undone.',
+        confirmLabel: 'Delete',
+        confirmColor: Colors.red,
+        onConfirm: () {
+          upiIds.remove(upi);
+          if (selectedUpi.value == upi) {
+            selectedUpi.value = upiIds.isNotEmpty ? upiIds.first : null;
+            if (upiIds.isEmpty && (Get.isBottomSheetOpen ?? false)) {
+              Get.back(); // close sheet
+            }
+          }
+          saveData();
+        },
+      ),
+    );
   }
 
   void clearAllUpiIds() {
-    upiIds.clear();
-    selectedUpi.value = null;
-    saveData();
-    // Close any open dialogs
-    if (Get.isBottomSheetOpen ?? false) {
-      Get.back();
-    }
+    Get.dialog(
+      _ConfirmDialog(
+        title: 'Clear All UPI IDs',
+        message: 'This will remove all saved UPI IDs. Are you sure?',
+        confirmLabel: 'Clear All',
+        confirmColor: Colors.red,
+        onConfirm: () {
+          upiIds.clear();
+          selectedUpi.value = null;
+          saveData();
+          if (Get.isBottomSheetOpen ?? false) Get.back();
+        },
+      ),
+    );
   }
 
-  bool get canShareOrSave => selectedUpi.value != null;
+  void setQuickAmount(double val) {
+    amountController.text = val.toStringAsFixed(val == val.roundToDouble() ? 0 : 2);
+  }
 
-  Future<void> shareQr(Uint8List imageBytes) async {
+  bool get canAct => selectedUpi.value != null;
+
+  Future<void> shareQr(Uint8List bytes) async {
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/upi_qr.png');
-    await file.writeAsBytes(imageBytes);
+    final file = File('${dir.path}/pay_qr.png');
+    await file.writeAsBytes(bytes);
     await Share.shareXFiles([XFile(file.path)], text: 'Scan to pay via UPI');
   }
 
-  Future<void> saveQr(Uint8List imageBytes) async {
+  Future<void> saveQr(Uint8List bytes) async {
     final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/upi_qr_${DateTime.now().millisecondsSinceEpoch}.png');
-    await file.writeAsBytes(imageBytes);
-    Get.snackbar("Saved", "Saved to: ${file.path}");
+    final file =
+        File('${dir.path}/pay_qr_${DateTime.now().millisecondsSinceEpoch}.png');
+    await file.writeAsBytes(bytes);
+    Get.snackbar('Saved', 'QR saved to: ${file.path}',
+        backgroundColor: Colors.green[100],
+        colorText: Colors.green[900],
+        snackPosition: SnackPosition.BOTTOM);
   }
 
   void _loadRewardedAd() async {
-    // Get AdMob key securely from native code
     final adUnitId = await getSecureRewardedAdUnitId();
-    
     RewardedAd.load(
-        adUnitId: adUnitId, // Secure AdMob key
+      adUnitId: adUnitId,
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
           rewardedAd = ad;
           isAdReady.value = true;
-
           rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
-            onAdDismissedFullScreenContent: (ad) {
+            onAdDismissedFullScreenContent: (_) {
               isAdReady.value = false;
               rewardedAd?.dispose();
               _loadRewardedAd();
             },
-            onAdFailedToShowFullScreenContent: (ad, error) {
+            onAdFailedToShowFullScreenContent: (_, __) {
               isAdReady.value = false;
               rewardedAd?.dispose();
               _loadRewardedAd();
             },
           );
         },
-        onAdFailedToLoad: (error) {
+        onAdFailedToLoad: (e) {
           isAdReady.value = false;
           rewardedAd = null;
-          logError('RewardedAd failed to load', error, StackTrace.current);
-          // Retry loading after some delay or logic if needed
+          logError('RewardedAd failed', e, StackTrace.current);
         },
       ),
     );
   }
 
-  void showRewardedAd(VoidCallback onRewardEarned) {
+  void showRewardedAd(VoidCallback onEarned) {
     if (isAdReady.value && rewardedAd != null) {
-      rewardedAd!.show(onUserEarnedReward: (ad, reward) {
-        onRewardEarned();
-      });
+      rewardedAd!.show(onUserEarnedReward: (_, __) => onEarned());
     } else {
-      Get.snackbar("Ad Not Ready", "Please try again later.");
+      Get.snackbar('Ad Not Ready', 'Please try again in a moment.',
+          snackPosition: SnackPosition.BOTTOM);
     }
   }
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return GetMaterialApp(
-      title: 'Pay QR',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: Colors.white,
-        textTheme: const TextTheme(bodyMedium: TextStyle(fontSize: 16, color: Colors.black)),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue[700],
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.blue[50],
-          labelStyle: const TextStyle(color: Colors.black),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.blue[700],
-          foregroundColor: Colors.white,
-        ),
-      ),
-      home: const SplashScreen(),
-    );
-  }
-}
-
-class UpiQrGenerator extends StatefulWidget {
-  const UpiQrGenerator({super.key});
-
-  @override
-  State<UpiQrGenerator> createState() => _UpiQrGeneratorState();
-}
-
-class _UpiQrGeneratorState extends State<UpiQrGenerator> {
-  @override
-  void initState() {
-    super.initState();
-    // Track screen view for analytics
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      trackScreen('UPI QR Generator');
-    });
-  }
+// ─── Home Screen ──────────────────────────────────────────────────────────────
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final c = Get.put(UpiController());
-    final formatCurrency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
+    final fmt =
+        NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          "Pay QR",
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
-          ),
-        ),
-        actions: [
-          // Test button for Firebase status
-          // IconButton(
-          //   icon: const Icon(Icons.bug_report, color: Colors.white),
-          //   onPressed: () => _testFirebaseStatus(c),
-          //   tooltip: "Test Firebase Status",
-          // ),
-          // Test button for logging system
-          // IconButton(
-          //   icon: const Icon(Icons.bug_report, color: Colors.white),
-          //   onPressed: () => _testLoggingSystem(),
-          //   tooltip: "Test Logging System",
-          // ),
-          Obx(() => IconButton(
-            icon: Icon(
-              Icons.share,
-              color: c.canShareOrSave ? Colors.white : Colors.white.withOpacity(0.3),
-            ),
-            onPressed: c.canShareOrSave ? () async {
-              // Show rewarded ad before sharing
-              c.showRewardedAd(() async {
-                final image = await c.screenshotController.capture();
-                if (image != null) {
-                  // Track share action for analytics
-                  trackEvent('qr_shared', {
-                    'upi_name': c.selectedUpi.value?['name'],
-                    'amount': c.amount.value.toString(),
-                    'split': c.split.value.toString(),
-                  });
-                  
-                  await c.shareQr(image);
-                }
-              });
-            } : null,
-            tooltip: c.canShareOrSave ? "Share QR Code" : "Select a UPI ID to share",
-          )),
-          Obx(() => IconButton(
-            icon: Icon(
-              Icons.save,
-              color: c.canShareOrSave ? Colors.white : Colors.white.withOpacity(0.3),
-            ),
-            onPressed: c.canShareOrSave ? () async {
-              // Show rewarded ad before saving
-              c.showRewardedAd(() async {
-                final image = await c.screenshotController.capture();
-                if (image != null) {
-                  // Track save action for analytics
-                  trackEvent('qr_saved', {
-                    'upi_name': c.selectedUpi.value?['name'],
-                    'amount': c.amount.value.toString(),
-                    'split': c.split.value.toString(),
-                  });
-                  
-                  await c.saveQr(image);
-                }
-              });
-            } : null,
-            tooltip: c.canShareOrSave ? "Save QR Code" : "Select a UPI ID to save",
-          )),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Obx(() {
-          final amount = c.amount.value;
-          final split = c.split.value;
-          final splitAmount = split > 0 ? amount / split : amount;
-          final upiDetails = c.selectedUpi.value != null
-              ? UPIDetails(
-            upiID: c.selectedUpi.value!['upiId']!,
-            payeeName: c.selectedUpi.value!['name'] ?? "Receiver",
-            amount: splitAmount,
-            transactionNote: "Split payment",
-          )
-              : null;
-
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap:  () => _showUpiSelector(context, c),
-                        child: Container(
-                          padding: EdgeInsets.only(left: 8,),
-                          decoration: BoxDecoration(
-                            color: Colors.white, // background (optional)
-                            borderRadius: BorderRadius.circular(12), // rounded corners
-                            border: Border.all(
-                              color: Colors.blue[700]!, // stroke color
-                              width: 2,           // stroke width
-                            ),),
-                          // constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width *.48) ,
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width:MediaQuery.of(context).size.width *.40,
-                                child: Text(
-                                  c.selectedUpi.value != null
-                                      ? "${c.selectedUpi.value!['name']}"
-                                      : "No UPI selected",
-                                  style: GoogleFonts.poppins(color: Colors.black87),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                        Spacer(),
-                              IconButton(
-                                icon: Icon(Icons.expand_more,color: Colors.blue[700]!,),
-                                onPressed: () => _showUpiSelector(context, c),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4,),
-                    ElevatedButton.icon(
-                      style: ButtonStyle(
-                        padding: MaterialStateProperty.all(
-                          const EdgeInsets.symmetric(vertical: 4, horizontal: 12), // 👈 vertical = 4
-                        ),
-                      ),
-                      icon: const Icon(Icons.add),
-                      label: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10.0),
-                        child: Text(
-                          "Add UPI",
-                          style: GoogleFonts.poppins(fontSize: 14),
-                        ),
-                      ),
-                      onPressed: () => _showAddUpiSheet(context, c),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                upiDetails != null
-                    ? Screenshot(
-                  key: ValueKey(upiDetails.upiID + splitAmount.toString()),
-                  controller: c.screenshotController,
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withOpacity(0.2),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          "Paying to:",
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
-                              color: Colors.grey[700], fontSize: 12),
-                        ),
-                        Text(
-                          c.selectedUpi.value!['upiId']!,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
-                              color: Colors.blue[700], fontSize: 18,fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 14),
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 700),
-                          transitionBuilder:
-                              (Widget child, Animation<double> animation) {
-                            return FadeTransition(
-                              opacity: CurvedAnimation(
-                                  parent: animation, curve: Curves.easeInOut),
-                              child: ScaleTransition(
-                                scale: CurvedAnimation(
-                                    parent: animation, curve: Curves.easeInOut),
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: UPIPaymentQRCode(
-                            upiDetails: upiDetails,
-                            size: 240,
-                            upiQRErrorCorrectLevel: UPIQRErrorCorrectLevel.low,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text("Scan the QR to pay",
-                            style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black)),
-                        const SizedBox(height: 6),
-                        Text(
-                          formatCurrency.format(splitAmount),
-                          style: GoogleFonts.poppins(
-                              color: Colors.blue[700],
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            Text(
-                              "Total: $amount",
-                              style: GoogleFonts.poppins(
-                                  color: Colors.black,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                            Text(
-                              "Splits: $split",
-                              style: GoogleFonts.poppins(
-                                  color: Colors.black,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                    : Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.grey[300]!, width: 2),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 240,
-                              height: 240,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.grey[300]!, width: 1),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.qr_code_scanner_outlined,
-                                    size: 80,
-                                    color: Colors.grey[400],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    "No UPI Selected",
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    "Select a UPI ID to generate QR code",
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14,
-                                      color: Colors.grey[500],
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            // Disabled functions info
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.orange[50],
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.orange[200]!, width: 1),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    color: Colors.orange[600],
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      "Share & Save functions are disabled until you select a UPI ID",
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 13,
-                                        color: Colors.orange[700],
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              "Amount: ${formatCurrency.format(amount)}",
-                              style: GoogleFonts.poppins(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                            if (split > 1) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                "Split into: $split parts",
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "Per person: ${formatCurrency.format(splitAmount)}",
-                                style: GoogleFonts.poppins(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.blue[700],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Theme(
-                        data: Theme.of(context).copyWith(
-                          textSelectionTheme: TextSelectionThemeData(
-                            cursorColor: Colors.blue[700],         // 👈 blinking line
-                            selectionColor: Colors.blue[700]?.withOpacity(0.3), // 👈 background of selected text
-                            selectionHandleColor: Colors.blue[700], // 👈 the draggable handle color
-                          ),
-                        ),
-                        child: TextField(
-                          controller: c.amountController,
-                          keyboardType: TextInputType.number,
-                          style: GoogleFonts.poppins(),
-                          cursorColor: Colors.blue[700],
-
-                          decoration: InputDecoration(
-                            labelText: "Total Amount",
-                            labelStyle: GoogleFonts.poppins(color: Colors.grey), // default
-                            floatingLabelStyle: GoogleFonts.poppins(color: Colors.blue[700]), // when focused
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(color: Colors.grey[500]!, width: 1.5), // default color
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(color: Colors.blue[700]!, width: 2.0), // when selected
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      child:
-                      Theme(
-                        data: Theme.of(context).copyWith(
-                          textSelectionTheme: TextSelectionThemeData(
-                            cursorColor: Colors.blue[700],         // 👈 blinking line
-                            selectionColor: Colors.blue[700]?.withOpacity(0.3), // 👈 background of selected text
-                            selectionHandleColor: Colors.blue[700], // 👈 the draggable handle color
-                          ),
-                        ),
-                        child: TextField(
-                        controller: c.splitController,
-                        keyboardType: TextInputType.number,
-                        style: GoogleFonts.poppins(),
-                        decoration: InputDecoration(
-                          labelText: "Split",
-                          labelStyle: GoogleFonts.poppins(color: Colors.grey), // default
-                          floatingLabelStyle: GoogleFonts.poppins(color: Colors.blue[700]),
-                          enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.grey[500]!, width: 1.5), // default color
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: Colors.blue[700]!, width: 2.0), // when selected
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      )),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  void _showUpiSelector(BuildContext context, UpiController c) {
-    Get.bottomSheet(
-      Container(
-        color: Colors.white,
+      backgroundColor: _bg,
+      body: SafeArea(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            // Header with Clear All button
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Select UPI ID",
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (c.upiIds.isNotEmpty)
-                    TextButton(
-                      onPressed: () {
-                        Get.dialog(
-                          AlertDialog(
-                            title: Text(
-                              "Clear All UPI IDs",
-                              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                            ),
-                            content: Text(
-                              "Are you sure you want to delete all saved UPI IDs? This action cannot be undone.",
-                              style: GoogleFonts.poppins(),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Get.back(),
-                                child: Text(
-                                  "Cancel",
-                                  style: GoogleFonts.poppins(color: Colors.grey),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Get.back();
-                                  c.clearAllUpiIds();
-                                },
-                                child: Text(
-                                  "Clear All",
-                                  style: GoogleFonts.poppins(color: Colors.red),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      child: Text(
-                        "Clear All",
-                        style: GoogleFonts.poppins(color: Colors.red),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // UPI List or Empty State
+            _AppBar(c: c),
             Expanded(
-              child: Obx(() {
-                if (c.upiIds.isEmpty) {
-                  return Container(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey[300]!, width: 1),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.account_balance_wallet_outlined,
-                                size: 48,
-                                color: Colors.grey[400],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "Empty",
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Obx(() {
+                  final amt = c.amount.value;
+                  final sp = c.split.value;
+                  final perPerson = sp > 0 ? amt / sp : amt;
+                  final upiDetails = c.selectedUpi.value != null
+                      ? UPIDetails(
+                          upiID: c.selectedUpi.value!['upiId']!,
+                          payeeName:
+                              c.selectedUpi.value!['name'] ?? 'Receiver',
+                          amount: perPerson,
+                          transactionNote: 'Split payment',
+                        )
+                      : null;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // UPI selector row
+                      _UpiSelectorRow(c: c),
+                      const SizedBox(height: 16),
+
+                      // QR card
+                      _QrCard(
+                          c: c,
+                          upiDetails: upiDetails,
+                          amt: amt,
+                          sp: sp,
+                          perPerson: perPerson,
+                          fmt: fmt),
+                      const SizedBox(height: 20),
+
+                      // Amount + Split inputs side by side
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: _InputCard(
+                              label: 'Total Amount',
+                              labelColor: _primary,
+                              icon: Icons.currency_rupee_rounded,
+                              child: TextField(
+                                controller: c.amountController,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey[500],
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w600),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: '0',
+                                  hintStyle: TextStyle(color: _divider),
+                                  contentPadding: EdgeInsets.zero,
+                                  isDense: true,
                                 ),
+                                cursorColor: _accent,
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          "No UPI IDs saved",
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey[700],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: _InputCard(
+                              label: 'Split',
+                              labelColor: _accent,
+                              icon: Icons.group_rounded,
+                              child: TextField(
+                                controller: c.splitController,
+                                keyboardType: TextInputType.number,
+                                style: GoogleFonts.poppins(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w600),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: '1',
+                                  hintStyle: TextStyle(color: _divider),
+                                  contentPadding: EdgeInsets.zero,
+                                  isDense: true,
+                                ),
+                                cursorColor: _accent,
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "Add a new UPI ID to get started",
-                          style: GoogleFonts.poppins(
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () {
-                            Get.back();
-                            _showAddUpiSheet(context, c);
-                          },
-                          child: Text(
-                            "Add UPI ID",
-                            style: GoogleFonts.poppins(color: Colors.white),
-                          ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Quick amount chips
+                      _QuickAmounts(c: c),
+                      const SizedBox(height: 24),
+                    ],
                   );
-                }
-                
-                return ListView(
-                  shrinkWrap: true,
-                  children: c.upiIds
-                      .map((upi) => ListTile(
-                    title: Text(
-                      upi['name'] ?? "",
-                      style: GoogleFonts.poppins(color: Colors.black),
-                    ),
-                    subtitle: Text(
-                      upi['upiId'] ?? "",
-                      style: GoogleFonts.poppins(color: Colors.black),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => c.deleteUpi(upi),
-                    ),
-                    onTap: () {
-                      c.selectedUpi.value = upi;
-                      c.saveData();
-                      
-                      // Track UPI selection for analytics
-                      trackEvent('upi_selected', {
-                        'upi_name': upi['name'],
-                        'upi_id': upi['upiId'],
-                      });
-                      
-                      Get.back();
-                    },
-                  ))
-                      .toList(),
-                );
-              }),
+                }),
+              ),
+            ),
+            // Footer pinned at bottom
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Center(
+                child: RichText(
+                  text: TextSpan(
+                    style: GoogleFonts.poppins(fontSize: 12, color: _textSub),
+                    children: const [
+                      TextSpan(text: 'Built with '),
+                      TextSpan(text: '❤️', style: TextStyle(fontSize: 13)),
+                      TextSpan(text: ' by '),
+                      TextSpan(
+                          text: 'Yashhh',
+                          style: TextStyle(
+                              color: _accent, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  void _showAddUpiSheet(BuildContext context, UpiController c) {
-    final upiIdController = TextEditingController();
-    final nameController = TextEditingController();
-
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius:
-          BorderRadius.vertical(top: Radius.circular(25)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "Add UPI ID",
-              style: GoogleFonts.poppins(
-                  fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            Theme(
-              data: Theme.of(context).copyWith(
-                textSelectionTheme: TextSelectionThemeData(
-                  cursorColor: Colors.blue[700],         // 👈 blinking line
-                  selectionColor: Colors.blue[700]?.withOpacity(0.3), // 👈 background of selected text
-                  selectionHandleColor: Colors.blue[700], // 👈 the draggable handle color
-                ),
-              ),
-              child:TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: "Name / Bank",
-                labelStyle: GoogleFonts.poppins(color: Colors.grey), // default
-                floatingLabelStyle: GoogleFonts.poppins(color: Colors.blue[700]),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.grey[500]!, width: 1.5), // default color
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.blue[700]!, width: 2.0), // when selected
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),),
-            const SizedBox(height: 12),
-        Theme(
-          data: Theme.of(context).copyWith(
-            textSelectionTheme: TextSelectionThemeData(
-              cursorColor: Colors.blue[700],         // 👈 blinking line
-              selectionColor: Colors.blue[700]?.withOpacity(0.3), // 👈 background of selected text
-              selectionHandleColor: Colors.blue[700], // 👈 the draggable handle color
-            ),
-          ),
-          child: TextField(
-              controller: upiIdController,
-              decoration: InputDecoration(
-                labelText: "UPI ID",
-                labelStyle: GoogleFonts.poppins(color: Colors.grey), // default
-                floatingLabelStyle: GoogleFonts.poppins(color: Colors.blue[700]),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.grey[500]!, width: 1.5), // default color
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.blue[700]!, width: 2.0), // when selected
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-          ),),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                final upiId = upiIdController.text.trim();
-                final name = nameController.text.trim();
-                if (upiId.isEmpty || name.isEmpty) {
-                  Get.snackbar("Error", "Please enter all fields");
-                  return;
-                }
-                
-                // Track UPI addition for analytics
-                trackEvent('upi_added', {
-                  'upi_name': name,
-                  'upi_id': upiId,
-                });
-                
-                c.addNewUpi(upiId, name);
-                Get.back();
-              },
-              child: const Text("Add"),
-            ),
-          ],
-        ),
-      ),
-      isScrollControlled: true,
-    );
-  }
-
-
-
-  void _testLoggingSystem() {
-    logDebug('This is a debug message.');
-    logInfo('This is an info message.');
-    logWarning('This is a warning message.');
-    logError('This is an error message.');
-    logCritical('This is a critical message.');
-
-    Get.snackbar(
-      "Logging Test",
-      "Debug, Info, Warning, Error, Critical messages have been logged. Check console.",
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.blue[100],
-      colorText: Colors.blue[800],
     );
   }
 }
 
+// ─── App Bar ──────────────────────────────────────────────────────────────────
+class _AppBar extends StatelessWidget {
+  final UpiController c;
+  const _AppBar({required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
+      child: Row(
+        children: [
+          // Logo dot + name
+          Container(
+            width: 10,
+            height: 10,
+            decoration:
+                const BoxDecoration(color: _accent, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Pay QR',
+                  style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: _primary)),
+              Text('SECURE UPI GENERATOR',
+                  style: GoogleFonts.poppins(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                      color: _textSub,
+                      letterSpacing: 1.2)),
+            ],
+          ),
+          const Spacer(),
+          // Share button
+          Obx(() => _IconBtn(
+                icon: Icons.ios_share_rounded,
+                enabled: c.canAct,
+                onTap: () async {
+                  c.showRewardedAd(() async {
+                    final img = await c.screenshotController.capture();
+                    if (img != null) {
+                      trackEvent('qr_shared', {
+                        'upi_name': c.selectedUpi.value?['name'],
+                        'amount': c.amount.value.toString(),
+                      });
+                      await c.shareQr(img);
+                    }
+                  });
+                },
+              )),
+          const SizedBox(width: 4),
+          // Save button
+          Obx(() => _IconBtn(
+                icon: Icons.download_rounded,
+                enabled: c.canAct,
+                onTap: () async {
+                  c.showRewardedAd(() async {
+                    final img = await c.screenshotController.capture();
+                    if (img != null) {
+                      trackEvent('qr_saved', {
+                        'upi_name': c.selectedUpi.value?['name'],
+                        'amount': c.amount.value.toString(),
+                      });
+                      await c.saveQr(img);
+                    }
+                  });
+                },
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _IconBtn extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _IconBtn(
+      {required this.icon, required this.enabled, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: enabled ? _card : _bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _divider),
+        ),
+        child: Icon(icon,
+            size: 18, color: enabled ? _primary : _divider),
+      ),
+    );
+  }
+}
+
+// ─── UPI Selector Row ─────────────────────────────────────────────────────────
+class _UpiSelectorRow extends StatelessWidget {
+  final UpiController c;
+  const _UpiSelectorRow({required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _showUpiSelector(context, c),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: _card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _divider),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('PAY TO ACCOUNT',
+                      style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: _textSub,
+                          letterSpacing: 0.8,
+                          fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Obx(() => Text(
+                              c.selectedUpi.value?['upiId'] ??
+                                  'Select UPI ID',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: c.selectedUpi.value != null
+                                      ? _primary
+                                      : _textSub),
+                              overflow: TextOverflow.ellipsis,
+                            )),
+                      ),
+                      const Icon(Icons.keyboard_arrow_down_rounded,
+                          color: _textSub, size: 20),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Add UPI button
+        GestureDetector(
+          onTap: () => _showAddUpiSheet(context, c),
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: _accent,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── QR Card ──────────────────────────────────────────────────────────────────
+class _QrCard extends StatelessWidget {
+  final UpiController c;
+  final UPIDetails? upiDetails;
+  final double amt, perPerson;
+  final int sp;
+  final NumberFormat fmt;
+
+  const _QrCard({
+    required this.c,
+    required this.upiDetails,
+    required this.amt,
+    required this.sp,
+    required this.perPerson,
+    required this.fmt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4))
+        ],
+      ),
+      child: upiDetails != null ? _ActiveQr(c: c, upiDetails: upiDetails!, amt: amt, sp: sp, perPerson: perPerson, fmt: fmt)
+                                : const _EmptyQr(),
+    );
+  }
+}
+
+class _EmptyQr extends StatelessWidget {
+  const _EmptyQr();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: const BoxDecoration(
+                color: _bg, shape: BoxShape.circle),
+            child: const Icon(Icons.qr_code_2_rounded,
+                size: 40, color: _divider),
+          ),
+          const SizedBox(height: 20),
+          Text('Ready to generate',
+              style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: _primary)),
+          const SizedBox(height: 6),
+          Text('Enter an amount below to create\nyour personal UPI QR code',
+              style:
+                  GoogleFonts.poppins(fontSize: 13, color: _textSub),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 28),
+          const Divider(color: _divider, height: 1),
+          const SizedBox(height: 16),
+          _InfoRow(label: 'PAYEE ID', value: 'Select a UPI ID'),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _AmountTile(label: 'TOTAL', value: '₹0'),
+              // const SizedBox(width: 16),
+              _AmountTile(label: 'PER PERSON', value: '₹0',alignRight: true),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActiveQr extends StatelessWidget {
+  final UpiController c;
+  final UPIDetails upiDetails;
+  final double amt, perPerson;
+  final int sp;
+  final NumberFormat fmt;
+
+  const _ActiveQr({
+    required this.c,
+    required this.upiDetails,
+    required this.amt,
+    required this.sp,
+    required this.perPerson,
+    required this.fmt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Screenshot(
+        key: ValueKey(upiDetails.upiID + perPerson.toString()),
+        controller: c.screenshotController,
+        child: Column(
+          children: [
+            // QR code
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: UPIPaymentQRCode(
+                key: ValueKey(upiDetails.upiID + perPerson.toString()),
+                upiDetails: upiDetails,
+                size: 220,
+                upiQRErrorCorrectLevel: UPIQRErrorCorrectLevel.low,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Divider(color: _divider, height: 1),
+            const SizedBox(height: 14),
+            _InfoRow(
+                label: 'PAYEE ID',
+                value: upiDetails.upiID,
+                valueColor: _primary,
+                bold: true,
+                copyable: true),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _AmountTile(
+                    label: 'TOTAL',
+                    value: fmt.format(amt),
+                    valueColor: _primary),
+                const SizedBox(width: 16),
+                _AmountTile(
+                    label: 'PER PERSON',
+                    value: fmt.format(perPerson),
+                    valueColor: _accent,
+                    alignRight: true),
+              ],
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label, value;
+  final Color? valueColor;
+  final bool bold;
+  final bool copyable;
+  const _InfoRow(
+      {required this.label,
+      required this.value,
+      this.valueColor,
+      this.bold = false,
+      this.copyable = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: _textSub,
+                letterSpacing: 0.6,
+                fontWeight: FontWeight.w500)),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(value,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+                      color: valueColor ?? _textSub)),
+            ),
+            if (copyable) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: value));
+                  Get.snackbar('Copied', 'UPI ID copied to clipboard',
+                      snackPosition: SnackPosition.BOTTOM,
+                      backgroundColor: Colors.green[100],
+                      colorText: Colors.green[900],
+                      duration: const Duration(seconds: 2));
+                },
+                child: const Icon(Icons.copy_rounded,
+                    size: 15, color: _textSub),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _AmountTile extends StatelessWidget {
+  final String label, value;
+  final Color? valueColor;
+  final bool alignRight;
+  const _AmountTile(
+      {required this.label, required this.value, this.valueColor, this.alignRight = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment:
+            alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: 10,
+                  color: _textSub,
+                  letterSpacing: 0.6)),
+          Text(value,
+              style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: valueColor ?? _primary)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Input Card ───────────────────────────────────────────────────────────────
+class _InputCard extends StatelessWidget {
+  final String label;
+  final Color? labelColor;
+  final IconData icon;
+  final Widget child;
+
+  const _InputCard({
+    required this.label,
+    required this.icon,
+    required this.child,
+    this.labelColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.4,
+                  color: labelColor ?? _primary)),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(icon, color: _accent, size: 18),
+              const SizedBox(width: 6),
+              Expanded(child: child),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Quick Amount Chips ───────────────────────────────────────────────────────
+class _QuickAmounts extends StatelessWidget {
+  final UpiController c;
+  const _QuickAmounts({required this.c});
+
+  static const amounts = [100.0, 500.0, 1000.0, 2000.0, 5000.0];
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: amounts
+            .map((a) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () => c.setQuickAmount(a),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _card,
+                        borderRadius: BorderRadius.circular(50),
+                        border: Border.all(color: _divider),
+                      ),
+                      child: Text(
+                        '₹${NumberFormat('#,##,###').format(a.toInt())}',
+                        style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: _primary),
+                      ),
+                    ),
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+  }
+}
+
+// ─── UPI Selector Bottom Sheet ────────────────────────────────────────────────
+void _showUpiSelector(BuildContext context, UpiController c) {
+  Get.bottomSheet(
+    Container(
+      decoration: const BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+                color: _divider, borderRadius: BorderRadius.circular(2)),
+          ),
+          // Header
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Select UPI ID',
+                    style: GoogleFonts.poppins(
+                        fontSize: 18, fontWeight: FontWeight.w700)),
+                GestureDetector(
+                  onTap: () {
+                    FocusScope.of(context).unfocus();
+                    Navigator.of(context).pop();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                        color: _bg,
+                        borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.close_rounded,
+                        size: 18, color: _textSub),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: _divider, height: 1),
+          // List
+          Obx(() => ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: c.upiIds.length,
+                separatorBuilder: (_, __) =>
+                    const Divider(color: _divider, height: 1, indent: 20),
+                itemBuilder: (_, i) {
+                  final upi = c.upiIds[i];
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 4),
+                    leading: Obx(() {
+                      final selected = c.selectedUpi.value == upi;
+                      return GestureDetector(
+                        onTap: () {
+                          c.selectedUpi.value = upi;
+                          c.saveData();
+                          Get.back();
+                        },
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: selected ? _accent : _divider,
+                              width: 2,
+                            ),
+                            color: selected ? _accent : Colors.transparent,
+                          ),
+                          child: selected
+                              ? const Icon(Icons.check,
+                                  size: 12, color: Colors.white)
+                              : null,
+                        ),
+                      );
+                    }),
+                    title: Text(upi['name'] ?? '',
+                        style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: _primary)),
+                    subtitle: Text(upi['upiId'] ?? '',
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, color: _textSub)),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Copy button
+                        GestureDetector(
+                          onTap: () {
+                            Clipboard.setData(
+                                ClipboardData(text: upi['upiId'] ?? ''));
+                            Get.snackbar('Copied', 'UPI ID copied to clipboard',
+                                snackPosition: SnackPosition.BOTTOM,
+                                backgroundColor: Colors.green[100],
+                                colorText: Colors.green[900],
+                                duration: const Duration(seconds: 2));
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(8)),
+                            child: Icon(Icons.copy_rounded,
+                                size: 16, color: Colors.blue[400]),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // Edit button
+                        GestureDetector(
+                          onTap: () =>
+                              _showAddUpiSheet(context, c, editUpi: upi),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                                color: Colors.orange[50],
+                                borderRadius: BorderRadius.circular(8)),
+                            child: Icon(Icons.edit_outlined,
+                                size: 16, color: Colors.orange[600]),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // Delete button
+                        GestureDetector(
+                          onTap: () => c.deleteUpi(upi),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                                color: Colors.red[50],
+                                borderRadius: BorderRadius.circular(8)),
+                            child: Icon(Icons.delete_outline_rounded,
+                                size: 16, color: Colors.red[400]),
+                          ),
+                        ),
+                      ],
+                    ),
+                    onTap: () {
+                      c.selectedUpi.value = upi;
+                      c.saveData();
+                      Get.back();
+                    },
+                  );
+                },
+              )),
+          // Clear All
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: GestureDetector(
+              onTap: () => c.clearAllUpiIds(),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                    border: Border.all(color: _divider),
+                    borderRadius: BorderRadius.circular(14)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.delete_sweep_rounded,
+                        size: 18, color: _textSub),
+                    const SizedBox(width: 8),
+                    Text('Clear All',
+                        style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: _textSub,
+                            fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: MediaQuery.of(context).padding.bottom),
+        ],
+      ),
+    ),
+    isScrollControlled: true,
+  );
+}
+
+// ─── Add / Edit UPI Bottom Sheet ─────────────────────────────────────────────
+void _showAddUpiSheet(BuildContext context, UpiController c,
+    {Map<String, String>? editUpi}) {
+  final upiCtrl =
+      TextEditingController(text: editUpi != null ? editUpi['upiId'] : '');
+  final nameCtrl =
+      TextEditingController(text: editUpi != null ? editUpi['name'] : '');
+  final isEdit = editUpi != null;
+  Get.bottomSheet(
+    Padding(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: _divider,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Header
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    FocusScope.of(context).unfocus();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Icon(Icons.close_rounded,
+                      color: _primary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Text(isEdit ? 'Edit UPI ID' : 'Add UPI ID',
+                    style: GoogleFonts.poppins(
+                        fontSize: 18, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            const SizedBox(height: 24),
+            // UPI ID field
+            _SheetField(
+              controller: upiCtrl,
+              hint: 'UPI ID (e.g., user@bank)',
+              prefixIcon: Icons.alternate_email_rounded,
+            ),
+            const SizedBox(height: 12),
+            // Name field
+            _SheetField(
+              controller: nameCtrl,
+              hint: 'Display Name (e.g., Personal, Business)',
+              prefixIcon: Icons.person_outline_rounded,
+            ),
+            const SizedBox(height: 16),
+            // Info box
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                  color: _bg,
+                  borderRadius: BorderRadius.circular(12)),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 18, color: _accent),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Adding a UPI ID allows you to request and receive payments directly to your chosen bank account linked with this ID.',
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: _textSub, height: 1.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Add / Save button
+            GestureDetector(
+              onTap: () {
+                final upiId = upiCtrl.text.trim();
+                final name = nameCtrl.text.trim();
+                if (upiId.isEmpty || name.isEmpty) {
+                  Get.snackbar('Missing Fields',
+                      'Please fill in both fields.',
+                      snackPosition: SnackPosition.BOTTOM);
+                  return;
+                }
+                final success = isEdit
+                    ? c.editUpi(editUpi, upiId, name)
+                    : c.addNewUpi(upiId, name);
+                if (success) {
+                  FocusScope.of(context).unfocus();
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                    color: _primary,
+                    borderRadius: BorderRadius.circular(14)),
+                child: Text(isEdit ? 'Save Changes' : 'Add UPI ID',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+    isScrollControlled: true,
+  );
+}
+
+class _SheetField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final IconData prefixIcon;
+
+  const _SheetField({
+    required this.controller,
+    required this.hint,
+    required this.prefixIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: _divider),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: controller,
+        style: GoogleFonts.poppins(fontSize: 14, color: _primary),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle:
+              GoogleFonts.poppins(fontSize: 14, color: _textSub),
+          prefixIcon:
+              Icon(prefixIcon, color: _textSub, size: 20),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16, vertical: 14),
+        ),
+        cursorColor: _accent,
+      ),
+    );
+  }
+}
+
+// ─── Confirmation Dialog ──────────────────────────────────────────────────────
+class _ConfirmDialog extends StatelessWidget {
+  final String title;
+  final String message;
+  final String confirmLabel;
+  final Color confirmColor;
+  final VoidCallback onConfirm;
+
+  const _ConfirmDialog({
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+    required this.confirmColor,
+    required this.onConfirm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: _card,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icon
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: confirmColor.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.warning_amber_rounded,
+                  color: confirmColor, size: 28),
+            ),
+            const SizedBox(height: 16),
+            // Title
+            Text(title,
+                style: GoogleFonts.poppins(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: _primary)),
+            const SizedBox(height: 8),
+            // Message
+            Text(message,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                    fontSize: 13, color: _textSub, height: 1.5)),
+            const SizedBox(height: 24),
+            // Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: _divider),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text('Cancel',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: _textSub)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onConfirm();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      decoration: BoxDecoration(
+                        color: confirmColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(confirmLabel,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

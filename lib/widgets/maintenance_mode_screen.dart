@@ -47,7 +47,7 @@ class _MaintenanceModeScreenState extends State<MaintenanceModeScreen> {
       // Check if maintenance mode is still active
       if (!FirebaseService.instance.isMaintenanceMode) {
         // Maintenance is over, navigate back to app
-        Get.offAll(() => const UpiQrGenerator());
+        Get.offAll(() => const HomeScreen());
       } else {
         // Still in maintenance, schedule next check
         _startAutoRefresh();
