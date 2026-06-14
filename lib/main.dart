@@ -8,14 +8,13 @@ import 'package:intl/intl.dart';
 import 'package:upi_payment_qrcode_generator/upi_payment_qrcode_generator.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:lottie/lottie.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'services/firebase_service.dart';
-import 'services/logging_service.dart';
-import 'services/secure_admob_service.dart';
 import 'widgets/force_update_dialog.dart';
 import 'widgets/maintenance_mode_screen.dart';
+import 'widgets/qr_scanner_screen.dart';
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const _bg = Color(0xFFF5F0EB);
@@ -28,6 +27,7 @@ const _divider = Color(0xFFE8E0D8);
 // ─── Entry point ──────────────────────────────────────────────────────────────
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
@@ -36,7 +36,6 @@ void main() async {
   final firebaseService = Get.put(FirebaseService());
   await firebaseService.initialize();
   await GetStorage.init();
-  MobileAds.instance.initialize();
 
   runApp(const MyApp());
 }
@@ -107,14 +106,13 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
-      body: Center(
-        child: Lottie.asset(
-          'assets/splash_animation.json',
-          controller: _ctrl,
-          onLoaded: (c) => _ctrl.duration = c.duration,
-          fit: BoxFit.contain,
-          width: 240,
-        ),
+      body: Lottie.asset(
+        'assets/splash_animation.json',
+        controller: _ctrl,
+        onLoaded: (c) => _ctrl.duration = c.duration,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
       ),
     );
   }
@@ -132,9 +130,6 @@ class UpiController extends GetxController {
   final amountController = TextEditingController();
   final splitController = TextEditingController(text: '1');
 
-  RewardedAd? rewardedAd;
-  var isAdReady = false.obs;
-
   @override
   void onInit() {
     super.onInit();
@@ -150,7 +145,6 @@ class UpiController extends GetxController {
         () => amount.value = double.tryParse(amountController.text) ?? 0.0);
     splitController.addListener(
         () => split.value = int.tryParse(splitController.text) ?? 1);
-    _loadRewardedAd();
   }
 
   void saveData() {
@@ -243,54 +237,27 @@ class UpiController extends GetxController {
     await Share.shareXFiles([XFile(file.path)], text: 'Scan to pay via UPI');
   }
 
-  Future<void> saveQr(Uint8List bytes) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final file =
-        File('${dir.path}/pay_qr_${DateTime.now().millisecondsSinceEpoch}.png');
-    await file.writeAsBytes(bytes);
-    Get.snackbar('Saved', 'QR saved to: ${file.path}',
-        backgroundColor: Colors.green[100],
-        colorText: Colors.green[900],
-        snackPosition: SnackPosition.BOTTOM);
-  }
-
-  void _loadRewardedAd() async {
-    final adUnitId = await getSecureRewardedAdUnitId();
-    RewardedAd.load(
-      adUnitId: adUnitId,
-      request: const AdRequest(),
-      rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          rewardedAd = ad;
-          isAdReady.value = true;
-          rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
-            onAdDismissedFullScreenContent: (_) {
-              isAdReady.value = false;
-              rewardedAd?.dispose();
-              _loadRewardedAd();
-            },
-            onAdFailedToShowFullScreenContent: (_, __) {
-              isAdReady.value = false;
-              rewardedAd?.dispose();
-              _loadRewardedAd();
-            },
-          );
-        },
-        onAdFailedToLoad: (e) {
-          isAdReady.value = false;
-          rewardedAd = null;
-          logError('RewardedAd failed', e, StackTrace.current);
-        },
-      ),
-    );
-  }
-
-  void showRewardedAd(VoidCallback onEarned) {
-    if (isAdReady.value && rewardedAd != null) {
-      rewardedAd!.show(onUserEarnedReward: (_, __) => onEarned());
-    } else {
-      Get.snackbar('Ad Not Ready', 'Please try again in a moment.',
-          snackPosition: SnackPosition.BOTTOM);
+  Future<String?> saveQr(Uint8List bytes) async {
+    try {
+      // Android 10+ (API 29+): no permission needed for Downloads folder
+      // Android 13+ (API 33+): WRITE_EXTERNAL_STORAGE is removed entirely
+      // Just write directly — this works on all modern Android versions
+      final downloadsDir = Directory('/storage/emulated/0/Download');
+      if (!await downloadsDir.exists()) {
+        // Fallback to app external storage if Downloads isn't accessible
+        final extDir = await getExternalStorageDirectory();
+        if (extDir == null) return null;
+        final fallback = Directory('${extDir.path}/PayQR');
+        await fallback.create(recursive: true);
+        final fileName = 'PayQR_${DateTime.now().millisecondsSinceEpoch}.png';
+        await File('${fallback.path}/$fileName').writeAsBytes(bytes);
+        return '${fallback.path}/$fileName';
+      }
+      final fileName = 'PayQR_${DateTime.now().millisecondsSinceEpoch}.png';
+      await File('${downloadsDir.path}/$fileName').writeAsBytes(bytes);
+      return '${downloadsDir.path}/$fileName';
+    } catch (e) {
+      return null;
     }
   }
 }
@@ -412,25 +379,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             // Footer pinned at bottom
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Center(
-                child: RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.poppins(fontSize: 12, color: _textSub),
-                    children: const [
-                      TextSpan(text: 'Built with '),
-                      TextSpan(text: '❤️', style: TextStyle(fontSize: 13)),
-                      TextSpan(text: ' by '),
-                      TextSpan(
-                          text: 'Yashhh',
-                          style: TextStyle(
-                              color: _accent, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            const _AppFooter(),
           ],
         ),
       ),
@@ -479,16 +428,14 @@ class _AppBar extends StatelessWidget {
                 icon: Icons.ios_share_rounded,
                 enabled: c.canAct,
                 onTap: () async {
-                  c.showRewardedAd(() async {
-                    final img = await c.screenshotController.capture();
-                    if (img != null) {
-                      trackEvent('qr_shared', {
-                        'upi_name': c.selectedUpi.value?['name'],
-                        'amount': c.amount.value.toString(),
-                      });
-                      await c.shareQr(img);
-                    }
-                  });
+                  final img = await c.screenshotController.capture();
+                  if (img != null) {
+                    trackEvent('qr_shared', {
+                      'upi_name': c.selectedUpi.value?['name'],
+                      'amount': c.amount.value.toString(),
+                    });
+                    await c.shareQr(img);
+                  }
                 },
               )),
           const SizedBox(width: 4),
@@ -497,16 +444,51 @@ class _AppBar extends StatelessWidget {
                 icon: Icons.download_rounded,
                 enabled: c.canAct,
                 onTap: () async {
-                  c.showRewardedAd(() async {
-                    final img = await c.screenshotController.capture();
-                    if (img != null) {
-                      trackEvent('qr_saved', {
-                        'upi_name': c.selectedUpi.value?['name'],
-                        'amount': c.amount.value.toString(),
-                      });
-                      await c.saveQr(img);
-                    }
-                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Row(
+                        children: [
+                          SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Saving to Downloads...'),
+                        ],
+                      ),
+                      backgroundColor: Colors.blue[700],
+                      duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  final img = await c.screenshotController.capture();
+                  if (img != null) {
+                    trackEvent('qr_saved', {
+                      'upi_name': c.selectedUpi.value?['name'],
+                      'amount': c.amount.value.toString(),
+                    });
+                    final fileName = await c.saveQr(img);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).clearSnackBars();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          fileName != null
+                              ? '✓ Saved to Downloads'
+                              : '✗ Save failed. Check storage permission.',
+                        ),
+                        backgroundColor: fileName != null
+                            ? Colors.green[700]
+                            : Colors.red[700],
+                        duration: const Duration(seconds: 3),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
                 },
               )),
         ],
@@ -724,14 +706,47 @@ class _ActiveQr extends StatelessWidget {
         controller: c.screenshotController,
         child: Column(
           children: [
-            // QR code
+            // QR code with logo overlay at center
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 400),
-              child: UPIPaymentQRCode(
-                key: ValueKey(upiDetails.upiID + perPerson.toString()),
-                upiDetails: upiDetails,
-                size: 220,
-                upiQRErrorCorrectLevel: UPIQRErrorCorrectLevel.low,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  UPIPaymentQRCode(
+                    key: ValueKey(upiDetails.upiID + perPerson.toString()),
+                    upiDetails: upiDetails,
+                    size: 220,
+                    upiQRErrorCorrectLevel: UPIQRErrorCorrectLevel.high,
+                  ),
+                  // Logo at center of QR
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 4,
+                        )
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.asset(
+                        'assets/ic_launcher.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.qr_code_2_rounded,
+                          color: _accent,
+                          size: 28,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 20),
@@ -758,6 +773,39 @@ class _ActiveQr extends StatelessWidget {
                     valueColor: _accent,
                     alignRight: true),
               ],
+            ),
+            const SizedBox(height: 16),
+            // Pay Now button
+            GestureDetector(
+              onTap: () => _launchUpiPayment(
+                context: context,
+                upiId: upiDetails.upiID,
+                name: upiDetails.payeeName,
+                amount: perPerson,
+              ),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: _primary,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.payment_rounded,
+                        color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Pay Now',
+                      style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 4),
           ],
@@ -1181,10 +1229,43 @@ void _showAddUpiSheet(BuildContext context, UpiController c,
             ),
             const SizedBox(height: 24),
             // UPI ID field
-            _SheetField(
-              controller: upiCtrl,
-              hint: 'UPI ID (e.g., user@bank)',
-              prefixIcon: Icons.alternate_email_rounded,
+            // UPI ID field + scan button
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _SheetField(
+                    controller: upiCtrl,
+                    hint: 'UPI ID (e.g., user@bank)',
+                    prefixIcon: Icons.alternate_email_rounded,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () async {
+                    final result = await Navigator.of(context).push<UpiScanResult>(
+                      MaterialPageRoute(
+                          builder: (_) => const QrScannerScreen()),
+                    );
+                    if (result != null) {
+                      upiCtrl.text = result.upiId;
+                      if (nameCtrl.text.isEmpty) {
+                        nameCtrl.text = result.name;
+                      }
+                    }
+                  },
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: _primary,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.qr_code_scanner_rounded,
+                        color: Colors.white, size: 22),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             // Name field
@@ -1295,6 +1376,43 @@ class _SheetField extends StatelessWidget {
   }
 }
 
+// ─── UPI Payment Launcher ─────────────────────────────────────────────────────
+Future<void> _launchUpiPayment({
+  required BuildContext context,
+  required String upiId,
+  required String name,
+  required double amount,
+}) async {
+  final amountStr = amount > 0 ? amount.toStringAsFixed(2) : '0';
+
+  final uri = Uri(
+    scheme: 'upi',
+    host: 'pay',
+    queryParameters: {
+      'pa': upiId,
+      'pn': name,
+      'am': amountStr,
+      'cu': 'INR',
+      'tn': 'Payment via Pay QR',
+    },
+  );
+
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } else {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+            'No UPI app found. Install GPay, PhonePe or any UPI app.'),
+        backgroundColor: Colors.orange[700],
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+}
+
 // ─── Confirmation Dialog ──────────────────────────────────────────────────────
 class _ConfirmDialog extends StatelessWidget {
   final String title;
@@ -1393,6 +1511,120 @@ class _ConfirmDialog extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── App Footer ───────────────────────────────────────────────────────────────
+class _AppFooter extends StatelessWidget {
+  const _AppFooter();
+
+  static const _storeUrl =
+      'https://play.google.com/store/apps/details?id=com.sylionixtech.payqr';
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _shareApp() async {
+    await SharePlus.instance.share(
+      ShareParams(
+        text:
+            '💸 Pay QR — Split bills & generate UPI QR codes instantly!\n\nDownload now: $_storeUrl',
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: _divider, width: 1)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Built with love
+          RichText(
+            text: TextSpan(
+              style: GoogleFonts.poppins(fontSize: 12, color: _textSub),
+              children: const [
+                TextSpan(text: 'Built with '),
+                TextSpan(text: '❤️', style: TextStyle(fontSize: 13)),
+                TextSpan(text: ' by '),
+                TextSpan(
+                    text: 'Yashhh',
+                    style: TextStyle(
+                        color: _accent, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Rate & Share buttons
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _openUrl(
+                      'market://details?id=com.sylionixtech.payqr'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _bg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _divider),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.star_rounded,
+                            size: 16, color: _accent),
+                        const SizedBox(width: 6),
+                        Text('Rate App',
+                            style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: _primary)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: _shareApp,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _bg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _divider),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.ios_share_rounded,
+                            size: 16, color: _accent),
+                        const SizedBox(width: 6),
+                        Text('Share App',
+                            style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: _primary)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

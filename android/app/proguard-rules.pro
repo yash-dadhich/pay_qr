@@ -46,10 +46,6 @@ x# Flutter specific rules
 -keep class com.baseflow.permissionhandler.** { *; }
 -dontwarn com.baseflow.permissionhandler.**
 
-# Google Mobile Ads
--keep class com.google.android.gms.ads.** { *; }
--dontwarn com.google.android.gms.ads.**
-
 # UPI QR Generator
 -keep class com.example.upi_payment_qrcode_generator.** { *; }
 -dontwarn com.example.upi_payment_qrcode_generator.**

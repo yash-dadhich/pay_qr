@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.sylionixtech.payqr"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -25,8 +25,8 @@ android {
         applicationId = "com.sylionixtech.payqr"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 3
-        versionName = '1.0.0'
+        versionCode = 4
+        versionName = '1.0.1'
 
         // Enable split APKs for different architectures
         ndk {

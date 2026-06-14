@@ -69,47 +69,30 @@ class SecureAdMobService {
     }
   }
   
-  /// 🚨 Fallback methods (use only if native method fails)
+  /// 🚨 Fallback methods (used when native channel fails)
   static String _getFallbackAppId() {
-    // This should never be called in production
-    // It's just a safety net
-    if (kDebugMode) {
-      return 'ca-app-pub-2438390987655762~7343872589'; // Your REAL App ID
-    }
-    throw Exception('AdMob App ID not available');
+    return 'ca-app-pub-2438390987655762~7343872589';
   }
-  
+
   static String _getFallbackBannerId() {
-    if (kDebugMode) {
-      return 'ca-app-pub-2438390987655762/1234567890'; // Add your real Banner ID here
-    }
-    throw Exception('Banner Ad Unit ID not available');
+    return 'ca-app-pub-2438390987655762/1234567890';
   }
-  
+
   static String _getFallbackInterstitialId() {
-    if (kDebugMode) {
-      return 'ca-app-pub-2438390987655762/0987654321'; // Add your real Interstitial ID here
-    }
-    throw Exception('Interstitial Ad Unit ID not available');
+    return 'ca-app-pub-2438390987655762/0987654321';
   }
-  
+
   static String _getFallbackRewardedId() {
-    if (kDebugMode) {
-      return 'ca-app-pub-2438390987655762/8434411215'; // Your REAL Rewarded Ad Unit ID
-    }
-    throw Exception('Rewarded Ad Unit ID not available');
+    return 'ca-app-pub-2438390987655762/8434411215';
   }
-  
+
   static Map<String, String> _getFallbackKeys() {
-    if (kDebugMode) {
-      return {
-        'app_id': _getFallbackAppId(),
-        'banner_ad_unit_id': _getFallbackBannerId(),
-        'interstitial_ad_unit_id': _getFallbackInterstitialId(),
-        'rewarded_ad_unit_id': _getFallbackRewardedId(),
-      };
-    }
-    throw Exception('AdMob keys not available');
+    return {
+      'app_id': _getFallbackAppId(),
+      'banner_ad_unit_id': _getFallbackBannerId(),
+      'interstitial_ad_unit_id': _getFallbackInterstitialId(),
+      'rewarded_ad_unit_id': _getFallbackRewardedId(),
+    };
   }
 }
 
