@@ -4,7 +4,6 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:get/get.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'dart:convert'; // Added for json.decode
 import 'logging_service.dart';
 
 /// 🏠 Firebase Service - Your Smart Home Controller
@@ -153,89 +152,45 @@ class FirebaseService extends GetxService {
   }
   
   /// 🔄 Check for Force Update (Emergency Broadcast)
-  /// This checks if users must update their app based on platform and version code
   Future<void> _checkForceUpdate() async {
     try {
       logDebug('Starting force update check...');
-      
-      // Get platform-specific settings
+
       final isAndroid = GetPlatform.isAndroid;
       final isIOS = GetPlatform.isIOS;
-      
-      logDebug('Platform detected - Android: $isAndroid, iOS: $isIOS');
-      
-      // Get current app version code from package info
+
+      // Get current app version code
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersionCode = int.tryParse(packageInfo.buildNumber) ?? 1;
-      
       logDebug('Current app version code: $currentVersionCode');
-      
-      // Get the JSON string from Remote Config
-      final jsonString = _remoteConfig.getString('force_update_required');
-      logDebug('Raw JSON string: $jsonString');
-      
-      // Parse the JSON string
-      Map<String, dynamic> configData = {};
-      try {
-        configData = json.decode(jsonString);
-        logDebug('Parsed JSON successfully');
-      } catch (e) {
-        logError('Failed to parse JSON', e, StackTrace.current);
-        return;
-      }
-      
-      // Extract values from parsed JSON
+
+      // Read flat top-level Remote Config keys directly
       bool forceUpdate = false;
       int minVersionCode = 1;
       String message = '';
       String storeUrl = '';
-      
+
       if (isAndroid) {
-        forceUpdate = configData['android_force_update_required'] ?? false;
-        minVersionCode = configData['android_minimum_version_code'] ?? 1;
-        message = configData['android_update_message'] ?? 'Please update your app.';
-        storeUrl = configData['android_store_url'] ?? '';
-        
-        logDebug('Android values from JSON:');
-        logDebug('  - android_force_update_required: $forceUpdate');
-        logDebug('  - android_minimum_version_code: $minVersionCode');
-        logDebug('  - android_update_message: $message');
+        forceUpdate = _remoteConfig.getBool('android_force_update_required');
+        minVersionCode = _remoteConfig.getInt('android_minimum_version_code');
+        message = _remoteConfig.getString('android_update_message');
+        storeUrl = _remoteConfig.getString('android_store_url');
       } else if (isIOS) {
-        forceUpdate = configData['ios_force_update_required'] ?? false;
-        minVersionCode = configData['ios_minimum_version_code'] ?? 1;
-        message = configData['ios_update_message'] ?? 'Please update your app.';
-        storeUrl = configData['ios_store_url'] ?? '';
-        
-        logDebug('iOS values from JSON:');
-        logDebug('  - ios_force_update_required: $forceUpdate');
-        logDebug('  - ios_minimum_version_code: $minVersionCode');
-        logDebug('  - ios_update_message: $message');
+        forceUpdate = _remoteConfig.getBool('ios_force_update_required');
+        minVersionCode = _remoteConfig.getInt('ios_minimum_version_code');
+        message = _remoteConfig.getString('ios_update_message');
+        storeUrl = _remoteConfig.getString('ios_store_url');
       }
-      
-      logDebug('Final values:');
-      logDebug('  - forceUpdate: $forceUpdate');
-      logDebug('  - minVersionCode: $minVersionCode');
-      logDebug('  - currentVersionCode: $currentVersionCode');
-      
-      // Check if current version is below minimum required version
+
+      logDebug('forceUpdate: $forceUpdate, minVersionCode: $minVersionCode, current: $currentVersionCode');
+
       final needsUpdate = currentVersionCode < minVersionCode;
       final shouldForceUpdate = forceUpdate && needsUpdate;
-      
-      logDebug('Logic results:');
-      logDebug('  - needsUpdate: $needsUpdate ($currentVersionCode < $minVersionCode)');
-      logDebug('  - shouldForceUpdate: $shouldForceUpdate ($forceUpdate && $needsUpdate)');
-      
-      // Update observable variables
+
       isForceUpdateRequired.value = shouldForceUpdate;
       minimumAppVersion.value = minVersionCode.toString();
       updateMessage.value = message;
-      
-      logDebug('Observable variables updated:');
-      logDebug('  - isForceUpdateRequired.value: ${isForceUpdateRequired.value}');
-      logDebug('  - minimumAppVersion.value: ${minimumAppVersion.value}');
-      logDebug('  - updateMessage.value: ${updateMessage.value}');
-      
-      // Store platform info for later use
+
       _platformInfo = {
         'is_android': isAndroid,
         'is_ios': isIOS,
@@ -246,35 +201,20 @@ class FirebaseService extends GetxService {
         'message': message,
         'store_url': storeUrl,
       };
-      
+
       if (shouldForceUpdate) {
-        logWarning('FORCE UPDATE REQUIRED!');
-        logInfo('Platform: ${isAndroid ? "Android" : "iOS"}');
-        logInfo('Current Version Code: $currentVersionCode');
-        logInfo('Minimum Required: $minVersionCode');
-        logInfo('Message: $message');
-        
-        // Track force update check
+        logWarning('FORCE UPDATE REQUIRED! current=$currentVersionCode min=$minVersionCode');
         await trackEvent(
           name: 'force_update_required',
           parameters: {
             'platform': isAndroid ? 'android' : 'ios',
             'current_version_code': currentVersionCode,
             'minimum_version_code': minVersionCode,
-            'message': message,
           },
         );
-      } else if (needsUpdate) {
-        logWarning('Update available but not forced');
-        logInfo('Platform: ${isAndroid ? "Android" : "iOS"}');
-        logInfo('Current Version Code: $currentVersionCode');
-        logInfo('Recommended Version: $minVersionCode');
       } else {
-        logSuccess('App is up to date');
-        logInfo('Platform: ${isAndroid ? "Android" : "iOS"}');
-        logInfo('Current Version Code: $currentVersionCode');
+        logSuccess('No force update needed. current=$currentVersionCode min=$minVersionCode');
       }
-      
     } catch (e) {
       logError('Force update check failed', e, StackTrace.current);
       _crashlytics.recordError(e, StackTrace.current);
