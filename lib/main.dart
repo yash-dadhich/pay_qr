@@ -1383,28 +1383,29 @@ Future<void> _launchUpiPayment({
   required String name,
   required double amount,
 }) async {
-  final amountStr = amount > 0 ? amount.toStringAsFixed(2) : '0';
+  final amountStr = amount > 0 ? amount.toStringAsFixed(2) : '0.00';
 
-  final uri = Uri(
-    scheme: 'upi',
-    host: 'pay',
-    queryParameters: {
-      'pa': upiId,
-      'pn': name,
-      'am': amountStr,
-      'cu': 'INR',
-      'tn': 'Payment via Pay QR',
-    },
-  );
+  // Build UPI deep link as a plain encoded URI string
+  // Format: upi://pay?pa=<upi_id>&pn=<name>&am=<amount>&cu=INR
+  final uriString =
+      'upi://pay?pa=${Uri.encodeComponent(upiId)}'
+      '&pn=${Uri.encodeComponent(name)}'
+      '&am=$amountStr'
+      '&cu=INR'
+      '&tn=${Uri.encodeComponent('Payment via Pay QR')}';
 
-  if (await canLaunchUrl(uri)) {
+  final uri = Uri.parse(uriString);
+
+  try {
+    // On Android 11+ canLaunchUrl needs the scheme declared in queries
+    // Skip canLaunchUrl check and try directly — catches exception if no app
     await launchUrl(uri, mode: LaunchMode.externalApplication);
-  } else {
+  } catch (e) {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text(
-            'No UPI app found. Install GPay, PhonePe or any UPI app.'),
+            'No UPI app found. Please install GPay, PhonePe or any UPI app.'),
         backgroundColor: Colors.orange[700],
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 3),
