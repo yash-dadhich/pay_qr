@@ -63,5 +63,9 @@
 			<string>cstr6suwn9.skadnetwork</string>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>This app requires camera access to scan UPI QR codes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app requires photo library access to scan UPI QR codes from images.</string>
 </dict>
 </plist>

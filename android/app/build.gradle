@@ -25,8 +25,8 @@ android {
         applicationId = "com.sylionixtech.payqr"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 5
-        versionName = '1.0.1'
+        versionCode = 7
+        versionName = '1.0.2'
 
         // Enable split APKs for different architectures
         ndk {
@@ -70,4 +70,8 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation 'com.google.zxing:core:3.5.3'
 }

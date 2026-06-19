@@ -14,7 +14,10 @@ import 'package:lottie/lottie.dart';
 import 'services/firebase_service.dart';
 import 'widgets/force_update_dialog.dart';
 import 'widgets/maintenance_mode_screen.dart';
+import 'package:home_widget/home_widget.dart';
+import 'dart:convert';
 import 'widgets/qr_scanner_screen.dart';
+
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const _bg = Color(0xFFF5F0EB);
@@ -46,15 +49,43 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final box = GetStorage();
+    final isDark = box.read<bool>('isDarkMode') ?? false;
+
     return GetMaterialApp(
       title: 'Pay QR',
       debugShowCheckedModeBanner: false,
+      themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       theme: ThemeData(
-        scaffoldBackgroundColor: _bg,
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFF5F0EB),
+        cardColor: Colors.white,
+        dividerColor: const Color(0xFFE8E0D8),
         fontFamily: GoogleFonts.poppins().fontFamily,
-        colorScheme: ColorScheme.light(
-          primary: _primary,
-          secondary: _accent,
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF1A1A2E),
+          secondary: Color(0xFFC8922A),
+          onPrimary: Colors.white,
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Color(0xFF1A1A2E)),
+          bodyMedium: TextStyle(color: Color(0xFF888888)),
+        ),
+      ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0F0F1A),
+        cardColor: const Color(0xFF1E1E30),
+        dividerColor: const Color(0xFF2C2C3E),
+        fontFamily: GoogleFonts.poppins().fontFamily,
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFFF5F0EB),
+          secondary: Color(0xFFDCA745),
+          onPrimary: Color(0xFF0F0F1A),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Color(0xFFF5F0EB)),
+          bodyMedium: TextStyle(color: Color(0xFFAAAAAA)),
         ),
       ),
       home: const SplashScreen(),
@@ -126,6 +157,7 @@ class UpiController extends GetxController {
   final selectedUpi = Rxn<Map<String, String>>();
   final amount = 0.0.obs;
   final split = 1.obs;
+  final isDarkMode = false.obs;
 
   final amountController = TextEditingController();
   final splitController = TextEditingController(text: '1');
@@ -141,15 +173,53 @@ class UpiController extends GetxController {
     if (selected != null) {
       selectedUpi.value = selected.map((k, v) => MapEntry(k, v.toString()));
     }
+    isDarkMode.value = box.read<bool>('isDarkMode') ?? false;
     amountController.addListener(
         () => amount.value = double.tryParse(amountController.text) ?? 0.0);
     splitController.addListener(
         () => split.value = int.tryParse(splitController.text) ?? 1);
+    
+    // Sync widget and listen for lifecycle changes
+    _syncToWidget();
+    
+    // Register listener to update widget storage when selectedUpi changes
+    ever(selectedUpi, (_) => _syncToWidget());
+    ever(upiIds, (_) => _syncToWidget());
+  }
+
+  Future<void> _syncToWidget() async {
+    try {
+      final listData = upiIds.map((e) => {'upiId': e['upiId'], 'name': e['name']}).toList();
+      final jsonStr = jsonEncode(listData);
+      
+      // Calculate current selected index
+      int index = 0;
+      if (selectedUpi.value != null) {
+        index = upiIds.indexWhere((e) => e['upiId'] == selectedUpi.value!['upiId']);
+        if (index == -1) index = 0;
+      }
+
+      await HomeWidget.saveWidgetData<String>('upi_list_json', jsonStr);
+      await HomeWidget.saveWidgetData<int>('selected_index', index);
+      await HomeWidget.updateWidget(
+        name: 'PayQrWidgetProvider',
+        androidName: 'PayQrWidgetProvider',
+      );
+    } catch (e) {
+      debugPrint("Failed to update widget data: $e");
+    }
+  }
+
+  void toggleTheme() {
+    isDarkMode.value = !isDarkMode.value;
+    box.write('isDarkMode', isDarkMode.value);
+    Get.changeThemeMode(isDarkMode.value ? ThemeMode.dark : ThemeMode.light);
   }
 
   void saveData() {
     box.write('upiIds', upiIds);
     box.write('selectedUpi', selectedUpi.value);
+    _syncToWidget();
   }
 
   bool addNewUpi(String upiId, String name) {
@@ -272,115 +342,169 @@ class HomeScreen extends StatelessWidget {
     final fmt =
         NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
-    return Scaffold(
-      backgroundColor: _bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _AppBar(c: c),
-            Expanded(
-              child: SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Obx(() {
-                  final amt = c.amount.value;
-                  final sp = c.split.value;
-                  final perPerson = sp > 0 ? amt / sp : amt;
-                  final upiDetails = c.selectedUpi.value != null
-                      ? UPIDetails(
-                          upiID: c.selectedUpi.value!['upiId']!,
-                          payeeName:
-                              c.selectedUpi.value!['name'] ?? 'Receiver',
-                          amount: perPerson,
-                          transactionNote: 'Split payment',
-                        )
-                      : null;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // UPI selector row
-                      _UpiSelectorRow(c: c),
-                      const SizedBox(height: 16),
-
-                      // QR card
-                      _QrCard(
-                          c: c,
-                          upiDetails: upiDetails,
-                          amt: amt,
-                          sp: sp,
-                          perPerson: perPerson,
-                          fmt: fmt),
-                      const SizedBox(height: 20),
-
-                      // Amount + Split inputs side by side
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: _InputCard(
-                              label: 'Total Amount',
-                              labelColor: _primary,
-                              icon: Icons.currency_rupee_rounded,
-                              child: TextField(
-                                controller: c.amountController,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                        decimal: true),
-                                style: GoogleFonts.poppins(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600),
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  hintText: '0',
-                                  hintStyle: TextStyle(color: _divider),
-                                  contentPadding: EdgeInsets.zero,
-                                  isDense: true,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: _bg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _AppBar(c: c),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Obx(() {
+                    final amt = c.amount.value;
+                    final sp = c.split.value;
+                    final perPerson = sp > 0 ? amt / sp : amt;
+                    final upiDetails = c.selectedUpi.value != null
+                        ? UPIDetails(
+                            upiID: c.selectedUpi.value!['upiId']!,
+                            payeeName:
+                                c.selectedUpi.value!['name'] ?? 'Receiver',
+                            amount: perPerson,
+                            transactionNote: 'Split payment',
+                          )
+                        : null;
+  
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // UPI selector row
+                        _UpiSelectorRow(c: c),
+                        const SizedBox(height: 16),
+  
+                        // QR card
+                        _QrCard(
+                            c: c,
+                            upiDetails: upiDetails,
+                            amt: amt,
+                            sp: sp,
+                            perPerson: perPerson,
+                            fmt: fmt),
+                        const SizedBox(height: 20),
+  
+                        // Amount + Split inputs side by side
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: _InputCard(
+                                label: 'Total Amount',
+                                labelColor: _primary,
+                                icon: Icons.currency_rupee_rounded,
+                                child: TextField(
+                                  controller: c.amountController,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w600),
+                                  decoration: InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: '0',
+                                    hintStyle: TextStyle(color: _textSub.withValues(alpha: 0.5)),
+                                    contentPadding: EdgeInsets.zero,
+                                    isDense: true,
+                                  ),
+                                  cursorColor: _accent,
                                 ),
-                                cursorColor: _accent,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            flex: 2,
-                            child: _InputCard(
-                              label: 'Split',
-                              labelColor: _accent,
-                              icon: Icons.group_rounded,
-                              child: TextField(
-                                controller: c.splitController,
-                                keyboardType: TextInputType.number,
-                                style: GoogleFonts.poppins(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600),
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  hintText: '1',
-                                  hintStyle: TextStyle(color: _divider),
-                                  contentPadding: EdgeInsets.zero,
-                                  isDense: true,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 2,
+                              child: _InputCard(
+                                label: 'Split',
+                                labelColor: _accent,
+                                icon: Icons.group_rounded,
+                                child: Row(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () {
+                                        int val = int.tryParse(c.splitController.text) ?? 1;
+                                        if (val > 1) {
+                                          c.splitController.text = (val - 1).toString();
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: _divider.withValues(alpha: 0.15),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(Icons.remove, size: 14, color: _primary),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: c.splitController,
+                                        keyboardType: TextInputType.number,
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.poppins(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.w600),
+                                        decoration: InputDecoration(
+                                          border: InputBorder.none,
+                                          hintText: '1',
+                                          hintStyle: TextStyle(color: _textSub.withValues(alpha: 0.5)),
+                                          contentPadding: EdgeInsets.zero,
+                                          isDense: true,
+                                        ),
+                                        cursorColor: _accent,
+                                      ),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () {
+                                        int val = int.tryParse(c.splitController.text) ?? 1;
+                                        c.splitController.text = (val + 1).toString();
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: _divider.withValues(alpha: 0.15),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(Icons.add, size: 14, color: _primary),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                cursorColor: _accent,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Quick amount chips
-                      _QuickAmounts(c: c),
-                      const SizedBox(height: 24),
-                    ],
-                  );
-                }),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+  
+                        // Quick amount chips
+                        _QuickAmounts(c: c),
+                        const SizedBox(height: 24),
+  
+                        // Footer moved inside ScrollView
+                        const _AppFooter(),
+                      ],
+                    );
+                  }),
+                ),
               ),
-            ),
-            // Footer pinned at bottom
-            const _AppFooter(),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -394,6 +518,14 @@ class _AppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
       child: Row(
@@ -403,7 +535,7 @@ class _AppBar extends StatelessWidget {
             width: 10,
             height: 10,
             decoration:
-                const BoxDecoration(color: _accent, shape: BoxShape.circle),
+                BoxDecoration(color: _accent, shape: BoxShape.circle),
           ),
           const SizedBox(width: 8),
           Column(
@@ -423,6 +555,15 @@ class _AppBar extends StatelessWidget {
             ],
           ),
           const Spacer(),
+          // Theme toggle button
+          Obx(() => _IconBtn(
+                icon: c.isDarkMode.value
+                    ? Icons.light_mode_rounded
+                    : Icons.dark_mode_rounded,
+                enabled: true,
+                onTap: () => c.toggleTheme(),
+              )),
+          const SizedBox(width: 4),
           // Share button
           Obx(() => _IconBtn(
                 icon: Icons.ios_share_rounded,
@@ -506,6 +647,14 @@ class _IconBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: Container(
@@ -530,6 +679,14 @@ class _UpiSelectorRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return Row(
       children: [
         Expanded(
@@ -557,7 +714,7 @@ class _UpiSelectorRow extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Obx(() => Text(
-                              c.selectedUpi.value?['upiId'] ??
+                              c.selectedUpi.value?['name'] ??
                                   'Select UPI ID',
                               style: GoogleFonts.poppins(
                                   fontSize: 15,
@@ -568,7 +725,7 @@ class _UpiSelectorRow extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             )),
                       ),
-                      const Icon(Icons.keyboard_arrow_down_rounded,
+                      Icon(Icons.keyboard_arrow_down_rounded,
                           color: _textSub, size: 20),
                     ],
                   ),
@@ -615,6 +772,14 @@ class _QrCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -638,6 +803,14 @@ class _EmptyQr extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
       child: Column(
@@ -645,9 +818,9 @@ class _EmptyQr extends StatelessWidget {
           Container(
             width: 80,
             height: 80,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
                 color: _bg, shape: BoxShape.circle),
-            child: const Icon(Icons.qr_code_2_rounded,
+            child: Icon(Icons.qr_code_2_rounded,
                 size: 40, color: _divider),
           ),
           const SizedBox(height: 20),
@@ -662,7 +835,7 @@ class _EmptyQr extends StatelessWidget {
                   GoogleFonts.poppins(fontSize: 13, color: _textSub),
               textAlign: TextAlign.center),
           const SizedBox(height: 28),
-          const Divider(color: _divider, height: 1),
+          Divider(color: _divider, height: 1),
           const SizedBox(height: 16),
           _InfoRow(label: 'PAYEE ID', value: 'Select a UPI ID'),
           const SizedBox(height: 12),
@@ -699,6 +872,14 @@ class _ActiveQr extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Screenshot(
@@ -709,48 +890,55 @@ class _ActiveQr extends StatelessWidget {
             // QR code with logo overlay at center
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 400),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  UPIPaymentQRCode(
-                    key: ValueKey(upiDetails.upiID + perPerson.toString()),
-                    upiDetails: upiDetails,
-                    size: 220,
-                    upiQRErrorCorrectLevel: UPIQRErrorCorrectLevel.high,
-                  ),
-                  // Logo at center of QR
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.12),
-                          blurRadius: 4,
-                        )
-                      ],
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    UPIPaymentQRCode(
+                      key: ValueKey(upiDetails.upiID + perPerson.toString()),
+                      upiDetails: upiDetails,
+                      size: 220,
+                      upiQRErrorCorrectLevel: UPIQRErrorCorrectLevel.high,
                     ),
-                    padding: const EdgeInsets.all(4),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: Image.asset(
-                        'assets/ic_launcher.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.qr_code_2_rounded,
-                          color: _accent,
-                          size: 28,
+                    // Logo at center of QR
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 4,
+                          )
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.asset(
+                          'assets/ic_launcher.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Icon(
+                            Icons.qr_code_2_rounded,
+                            color: _accent,
+                            size: 28,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 20),
-            const Divider(color: _divider, height: 1),
+            Divider(color: _divider, height: 1),
             const SizedBox(height: 14),
             _InfoRow(
                 label: 'PAYEE ID',
@@ -793,15 +981,15 @@ class _ActiveQr extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.payment_rounded,
-                        color: Colors.white, size: 18),
+                    Icon(Icons.payment_rounded,
+                        color: theme.colorScheme.onPrimary, size: 18),
                     const SizedBox(width: 8),
                     Text(
                       'Pay Now',
                       style: GoogleFonts.poppins(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white),
+                          color: theme.colorScheme.onPrimary),
                     ),
                   ],
                 ),
@@ -829,6 +1017,14 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -838,33 +1034,37 @@ class _InfoRow extends StatelessWidget {
                 color: _textSub,
                 letterSpacing: 0.6,
                 fontWeight: FontWeight.w500)),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(value,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-                      color: valueColor ?? _textSub)),
-            ),
-            if (copyable) ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: value));
-                  Get.snackbar('Copied', 'UPI ID copied to clipboard',
-                      snackPosition: SnackPosition.BOTTOM,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(value,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+                        color: valueColor ?? _textSub)),
+              ),
+              if (copyable) ...[
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: value));
+                    Get.snackbar('Copied', 'UPI ID copied to clipboard',
+                        snackPosition: SnackPosition.BOTTOM,
                       backgroundColor: Colors.green[100],
                       colorText: Colors.green[900],
                       duration: const Duration(seconds: 2));
                 },
-                child: const Icon(Icons.copy_rounded,
+                child: Icon(Icons.copy_rounded,
                     size: 15, color: _textSub),
               ),
             ],
           ],
+        ),
         ),
       ],
     );
@@ -880,6 +1080,14 @@ class _AmountTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return Expanded(
       child: Column(
         crossAxisAlignment:
@@ -917,6 +1125,14 @@ class _InputCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       decoration: BoxDecoration(
@@ -957,6 +1173,14 @@ class _QuickAmounts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -991,11 +1215,19 @@ class _QuickAmounts extends StatelessWidget {
 
 // ─── UPI Selector Bottom Sheet ────────────────────────────────────────────────
 void _showUpiSelector(BuildContext context, UpiController c) {
+  final theme = Theme.of(context);
+  final _bg = theme.scaffoldBackgroundColor;
+  final _card = theme.cardColor;
+  final _primary = theme.colorScheme.primary;
+  final _accent = theme.colorScheme.secondary;
+  final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+  final _divider = theme.dividerColor;
+
   Get.bottomSheet(
     Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _card,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1028,21 +1260,21 @@ void _showUpiSelector(BuildContext context, UpiController c) {
                     decoration: BoxDecoration(
                         color: _bg,
                         borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.close_rounded,
+                    child: Icon(Icons.close_rounded,
                         size: 18, color: _textSub),
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(color: _divider, height: 1),
+          Divider(color: _divider, height: 1),
           // List
           Obx(() => ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: c.upiIds.length,
                 separatorBuilder: (_, __) =>
-                    const Divider(color: _divider, height: 1, indent: 20),
+                    Divider(color: _divider, height: 1, indent: 20),
                 itemBuilder: (_, i) {
                   final upi = c.upiIds[i];
                   return ListTile(
@@ -1156,7 +1388,7 @@ void _showUpiSelector(BuildContext context, UpiController c) {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.delete_sweep_rounded,
+                    Icon(Icons.delete_sweep_rounded,
                         size: 18, color: _textSub),
                     const SizedBox(width: 8),
                     Text('Clear All',
@@ -1180,6 +1412,14 @@ void _showUpiSelector(BuildContext context, UpiController c) {
 // ─── Add / Edit UPI Bottom Sheet ─────────────────────────────────────────────
 void _showAddUpiSheet(BuildContext context, UpiController c,
     {Map<String, String>? editUpi}) {
+  final theme = Theme.of(context);
+  final _bg = theme.scaffoldBackgroundColor;
+  final _card = theme.cardColor;
+  final _primary = theme.colorScheme.primary;
+  final _accent = theme.colorScheme.secondary;
+  final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+  final _divider = theme.dividerColor;
+
   final upiCtrl =
       TextEditingController(text: editUpi != null ? editUpi['upiId'] : '');
   final nameCtrl =
@@ -1190,9 +1430,9 @@ void _showAddUpiSheet(BuildContext context, UpiController c,
       padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: _card,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
         child: Column(
@@ -1218,7 +1458,7 @@ void _showAddUpiSheet(BuildContext context, UpiController c,
                     FocusScope.of(context).unfocus();
                     Navigator.of(context).pop();
                   },
-                  child: const Icon(Icons.close_rounded,
+                  child: Icon(Icons.close_rounded,
                       color: _primary, size: 22),
                 ),
                 const SizedBox(width: 12),
@@ -1228,7 +1468,6 @@ void _showAddUpiSheet(BuildContext context, UpiController c,
               ],
             ),
             const SizedBox(height: 24),
-            // UPI ID field
             // UPI ID field + scan button
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1261,8 +1500,8 @@ void _showAddUpiSheet(BuildContext context, UpiController c,
                       color: _primary,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.qr_code_scanner_rounded,
-                        color: Colors.white, size: 22),
+                    child: Icon(Icons.qr_code_scanner_rounded,
+                        color: theme.colorScheme.onPrimary, size: 22),
                   ),
                 ),
               ],
@@ -1328,7 +1567,7 @@ void _showAddUpiSheet(BuildContext context, UpiController c,
                     style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white)),
+                        color: theme.colorScheme.onPrimary)),
               ),
             ),
           ],
@@ -1352,6 +1591,14 @@ class _SheetField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: _divider),
@@ -1432,6 +1679,14 @@ class _ConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return Dialog(
       backgroundColor: _card,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -1542,9 +1797,17 @@ class _AppFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _textSub = theme.textTheme.bodyMedium?.color ?? const Color(0xFF888888);
+    final _divider = theme.dividerColor;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(top: BorderSide(color: _divider, width: 1)),
       ),
       child: Column(
@@ -1554,10 +1817,10 @@ class _AppFooter extends StatelessWidget {
           RichText(
             text: TextSpan(
               style: GoogleFonts.poppins(fontSize: 12, color: _textSub),
-              children: const [
-                TextSpan(text: 'Built with '),
-                TextSpan(text: '❤️', style: TextStyle(fontSize: 13)),
-                TextSpan(text: ' by '),
+              children: [
+                const TextSpan(text: 'Built with '),
+                const TextSpan(text: '❤️', style: TextStyle(fontSize: 13)),
+                const TextSpan(text: ' by '),
                 TextSpan(
                     text: 'Yashhh',
                     style: TextStyle(
@@ -1583,7 +1846,7 @@ class _AppFooter extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.star_rounded,
+                        Icon(Icons.star_rounded,
                             size: 16, color: _accent),
                         const SizedBox(width: 6),
                         Text('Rate App',
@@ -1610,7 +1873,7 @@ class _AppFooter extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.ios_share_rounded,
+                        Icon(Icons.ios_share_rounded,
                             size: 16, color: _accent),
                         const SizedBox(width: 6),
                         Text('Share App',

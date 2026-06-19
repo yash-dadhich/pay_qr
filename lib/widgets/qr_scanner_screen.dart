@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:image_picker/image_picker.dart';
 
 const _accent = Color(0xFFC8922A);
 const _primary = Color(0xFF1A1A2E);
@@ -64,23 +65,42 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     super.dispose();
   }
 
-  /// Parse UPI deep link: upi://pay?pa=upiid@bank&pn=Name&...
+  /// Parse UPI deep link or raw UPI ID from scanned QR code
   UpiScanResult? _parseUpiQr(String raw) {
     try {
-      final uri = Uri.parse(raw);
-      final pa = uri.queryParameters['pa'];
-      final pn = uri.queryParameters['pn'];
-      if (pa == null || pa.isEmpty) return null;
-      if (!RegExp(r'^[a-zA-Z0-9._\-+]+@[a-zA-Z]{2,}$').hasMatch(pa)) {
-        return null;
+      final cleanRaw = raw.trim();
+      if (cleanRaw.isEmpty) return null;
+
+      // 1. Check if it's a UPI URI or HTTP/HTTPS redirection URL containing a 'pa' parameter
+      if (cleanRaw.toLowerCase().startsWith('upi://') ||
+          cleanRaw.toLowerCase().startsWith('http://') ||
+          cleanRaw.toLowerCase().startsWith('https://')) {
+        final uri = Uri.parse(cleanRaw);
+        final pa = uri.queryParameters['pa'];
+        final pn = uri.queryParameters['pn'];
+        if (pa != null && pa.trim().isNotEmpty) {
+          final cleanPa = pa.trim();
+          if (cleanPa.contains('@')) {
+            return UpiScanResult(
+              upiId: cleanPa,
+              name: (pn != null && pn.trim().isNotEmpty) ? Uri.decodeComponent(pn.trim()) : cleanPa,
+            );
+          }
+        }
       }
-      return UpiScanResult(
-        upiId: pa,
-        name: (pn != null && pn.isNotEmpty) ? Uri.decodeComponent(pn) : pa,
-      );
-    } catch (_) {
-      return null;
-    }
+
+      // 2. Check if the scanned text is a direct raw UPI ID (e.g., name@bank)
+      if (cleanRaw.contains('@') && !cleanRaw.contains(' ') && !cleanRaw.contains('/') && !cleanRaw.contains('?')) {
+        final parts = cleanRaw.split('@');
+        if (parts.length == 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+          return UpiScanResult(
+            upiId: cleanRaw,
+            name: cleanRaw,
+          );
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -106,6 +126,55 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     setState(() => _torchOn = !_torchOn);
   }
 
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+
+      setState(() => _loading = true);
+
+      final isTempCtrl = _ctrl == null;
+      final scannerCtrl = _ctrl ?? MobileScannerController();
+      final barcode = await scannerCtrl.analyzeImage(image.path);
+
+      if (isTempCtrl) {
+        scannerCtrl.dispose();
+      }
+
+      if (barcode != null && barcode.barcodes.isNotEmpty) {
+        final raw = barcode.barcodes.first.rawValue ?? '';
+        if (raw.isNotEmpty) {
+          final result = _parseUpiQr(raw);
+          if (result != null) {
+            if (mounted) {
+              Navigator.of(context).pop(result);
+            }
+            return;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'No valid UPI QR code found in image.';
+        });
+        Future.delayed(
+            const Duration(seconds: 3), () => setState(() => _error = null));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'Failed to read image. Please try again.';
+        });
+        Future.delayed(
+            const Duration(seconds: 3), () => setState(() => _error = null));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -113,7 +182,22 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _accent))
           : _permissionDenied
-              ? _PermissionDeniedView()
+              ? Stack(
+                  children: [
+                    _PermissionDeniedView(onPickFromGallery: _pickImageFromGallery),
+                    // Back button on top of permission denied view
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        child: _TopBtn(
+                          icon: Icons.arrow_back_rounded,
+                          onTap: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
               : Stack(
                   children: [
                     // Camera feed
@@ -145,6 +229,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                                   color: Colors.white),
                             ),
                             const Spacer(),
+                            _TopBtn(
+                              icon: Icons.photo_library_rounded,
+                              onTap: _pickImageFromGallery,
+                            ),
+                            const SizedBox(width: 8),
                             _TopBtn(
                               icon: _torchOn
                                   ? Icons.flashlight_off_rounded
@@ -193,6 +282,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
 // ─── Permission Denied View ───────────────────────────────────────────────────
 class _PermissionDeniedView extends StatelessWidget {
+  final VoidCallback onPickFromGallery;
+  const _PermissionDeniedView({required this.onPickFromGallery});
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -217,6 +309,31 @@ class _PermissionDeniedView extends StatelessWidget {
                     GoogleFonts.poppins(fontSize: 14, color: Colors.white60),
                 textAlign: TextAlign.center),
             const SizedBox(height: 24),
+            // Choose from Gallery Button
+            GestureDetector(
+              onTap: onPickFromGallery,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                decoration: BoxDecoration(
+                    color: Colors.white12,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white24)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.photo_library_rounded, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Text('Choose from Gallery',
+                        style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
