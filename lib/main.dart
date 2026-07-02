@@ -11,12 +11,16 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:lottie/lottie.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import 'services/firebase_service.dart';
 import 'widgets/force_update_dialog.dart';
 import 'widgets/maintenance_mode_screen.dart';
 import 'package:home_widget/home_widget.dart';
 import 'dart:convert';
 import 'widgets/qr_scanner_screen.dart';
+import 'services/expense_controller.dart';
+import 'services/onboarding_service.dart';
+import 'widgets/group_split_screen.dart';
 
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
@@ -39,6 +43,9 @@ void main() async {
   final firebaseService = Get.put(FirebaseService());
   await firebaseService.initialize();
   await GetStorage.init();
+  Get.put(UpiController());
+  Get.put(ExpenseController());
+  Get.put(OnboardingService());
 
   runApp(const MyApp());
 }
@@ -332,13 +339,260 @@ class UpiController extends GetxController {
   }
 }
 
-// ─── Home Screen ──────────────────────────────────────────────────────────────
+// ─── Home Screen (Tabs) ───────────────────────────────────────────────────────
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final c = Get.put(UpiController());
+    final expCtrl = Get.find<ExpenseController>();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final _bg = theme.scaffoldBackgroundColor;
+    final _card = theme.cardColor;
+    final _primary = theme.colorScheme.primary;
+    final _accent = theme.colorScheme.secondary;
+    final _divider = theme.dividerColor;
+
+    final List<Widget> screens = [
+      const QuickQrScreen(),
+      const GroupSplitScreen(),
+    ];
+
+    return Obx(() => PopScope(
+      canPop: expCtrl.currentTab.value == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (expCtrl.currentTab.value == 1) {
+          expCtrl.currentTab.value = 0;
+        }
+      },
+      child: Scaffold(
+        backgroundColor: _bg,
+        body: IndexedStack(
+          index: expCtrl.currentTab.value,
+          children: screens,
+        ),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: _card,
+            border: Border(
+              top: BorderSide(color: _divider, width: 1),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(
+                    index: 0,
+                    icon: Icons.qr_code_scanner_rounded,
+                    label: 'Quick QR',
+                    activeColor: _accent,
+                    inactiveColor: _primary.withOpacity(0.4),
+                    selectedIdx: expCtrl.currentTab.value,
+                    onTap: () => expCtrl.currentTab.value = 0,
+                  ),
+                  _buildNavItem(
+                    index: 1,
+                    icon: Icons.groups_rounded,
+                    label: 'Group Split',
+                    activeColor: _accent,
+                    inactiveColor: _primary.withOpacity(0.4),
+                    selectedIdx: expCtrl.currentTab.value,
+                    onTap: () => expCtrl.currentTab.value = 1,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+  }
+
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+    required String label,
+    required Color activeColor,
+    required Color inactiveColor,
+    required int selectedIdx,
+    required VoidCallback onTap,
+  }) {
+    final isSelected = selectedIdx == index;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? activeColor : inactiveColor,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                color: isSelected ? activeColor : inactiveColor,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Quick QR Screen ──────────────────────────────────────────────────────────
+class QuickQrScreen extends StatefulWidget {
+  const QuickQrScreen({super.key});
+
+  @override
+  State<QuickQrScreen> createState() => _QuickQrScreenState();
+}
+
+class _QuickQrScreenState extends State<QuickQrScreen> {
+  // GlobalKeys for coach marks
+  final _keyAddBtn = GlobalKey();
+  final _keySelector = GlobalKey();
+  final _keyAmountField = GlobalKey();
+  final _keyQuickChips = GlobalKey();
+  final _keyShareBtn = GlobalKey();
+  final _keyDownloadBtn = GlobalKey();
+  final _keyPayNow = GlobalKey();
+
+  late final UpiController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = Get.find<UpiController>();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startTourIfNeeded());
+  }
+
+  void _startTourIfNeeded() {
+    final svc = OnboardingService.instance;
+    if (!svc.shouldShowQuickQrTour) return;
+    _showQuickQrTour();
+  }
+
+  void _showQuickQrTour() {
+    final accent = Theme.of(context).colorScheme.secondary;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    final targets = [
+      _target(
+        key: _keyAddBtn,
+        title: 'Add Your First Contact',
+        body: 'Tap here to save your milkman, maid, or anyone you pay regularly.',
+        accent: accent,
+        shape: ShapeLightFocus.Circle,
+      ),
+      _target(
+        key: _keySelector,
+        title: 'Switch Contacts',
+        body: 'Tap here to switch between your saved contacts anytime.',
+        accent: accent,
+      ),
+      _target(
+        key: _keyAmountField,
+        title: 'Enter Amount',
+        body: 'Type the amount you want to pay — or use the quick chips below.',
+        accent: accent,
+      ),
+      _target(
+        key: _keyQuickChips,
+        title: 'Quick Amount Chips',
+        body: 'Tap ₹100, ₹500, ₹1,000 etc. to fill the amount instantly.',
+        accent: accent,
+      ),
+      _target(
+        key: _keyShareBtn,
+        title: 'Share QR',
+        body: 'Share this QR on WhatsApp, Telegram — anywhere.',
+        accent: accent,
+        shape: ShapeLightFocus.Circle,
+      ),
+      _target(
+        key: _keyDownloadBtn,
+        title: 'Download QR',
+        body: 'Save the QR to your Downloads folder.',
+        accent: accent,
+        shape: ShapeLightFocus.Circle,
+      ),
+      _target(
+        key: _keyPayNow,
+        title: 'Pay Directly',
+        body: 'Tap Pay Now to open GPay, PhonePe, or any UPI app pre-filled.',
+        accent: accent,
+      ),
+    ];
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: primary,
+      opacityShadow: 0.85,
+      textSkip: 'SKIP',
+      paddingFocus: 12,
+      onFinish: () => OnboardingService.instance.markQuickQrDone(),
+      onSkip: () {
+        OnboardingService.instance.markQuickQrDone();
+        return true;
+      },
+    ).show(context: context);
+  }
+
+  TargetFocus _target({
+    required GlobalKey key,
+    required String title,
+    required String body,
+    required Color accent,
+    ShapeLightFocus shape = ShapeLightFocus.RRect,
+  }) {
+    return TargetFocus(
+      identify: key.toString(),
+      keyTarget: key,
+      shape: shape,
+      radius: 12,
+      contents: [
+        TargetContent(
+          align: ContentAlign.bottom,
+          builder: (context, controller) => _TourTooltip(
+            title: title,
+            body: body,
+            accent: accent,
+            onNext: controller.next,
+            onSkip: controller.skip,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _c;
     final fmt =
         NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
@@ -362,7 +616,7 @@ class HomeScreen extends StatelessWidget {
         body: SafeArea(
           child: Column(
             children: [
-              _AppBar(c: c),
+              _AppBar(c: c, shareKey: _keyShareBtn, downloadKey: _keyDownloadBtn),
               Expanded(
                 child: SingleChildScrollView(
                   padding:
@@ -385,12 +639,13 @@ class HomeScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // UPI selector row
-                        _UpiSelectorRow(c: c),
+                        _UpiSelectorRow(c: c, addBtnKey: _keyAddBtn, selectorKey: _keySelector),
                         const SizedBox(height: 16),
   
                         // QR card
                         _QrCard(
                             c: c,
+                            payNowKey: _keyPayNow,
                             upiDetails: upiDetails,
                             amt: amt,
                             sp: sp,
@@ -400,6 +655,7 @@ class HomeScreen extends StatelessWidget {
   
                         // Amount + Split inputs side by side
                         Row(
+                          key: _keyAmountField,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
@@ -493,7 +749,7 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(height: 12),
   
                         // Quick amount chips
-                        _QuickAmounts(c: c),
+                        _QuickAmounts(c: c, chipKey: _keyQuickChips),
                         const SizedBox(height: 24),
   
                         // Footer moved inside ScrollView
@@ -514,7 +770,9 @@ class HomeScreen extends StatelessWidget {
 // ─── App Bar ──────────────────────────────────────────────────────────────────
 class _AppBar extends StatelessWidget {
   final UpiController c;
-  const _AppBar({required this.c});
+  final GlobalKey? shareKey;
+  final GlobalKey? downloadKey;
+  const _AppBar({required this.c, this.shareKey, this.downloadKey});
 
   @override
   Widget build(BuildContext context) {
@@ -566,6 +824,7 @@ class _AppBar extends StatelessWidget {
           const SizedBox(width: 4),
           // Share button
           Obx(() => _IconBtn(
+                key: shareKey,
                 icon: Icons.ios_share_rounded,
                 enabled: c.canAct,
                 onTap: () async {
@@ -582,6 +841,7 @@ class _AppBar extends StatelessWidget {
           const SizedBox(width: 4),
           // Save button
           Obx(() => _IconBtn(
+                key: downloadKey,
                 icon: Icons.download_rounded,
                 enabled: c.canAct,
                 onTap: () async {
@@ -643,7 +903,7 @@ class _IconBtn extends StatelessWidget {
   final bool enabled;
   final VoidCallback onTap;
   const _IconBtn(
-      {required this.icon, required this.enabled, required this.onTap});
+      {super.key, required this.icon, required this.enabled, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -675,7 +935,9 @@ class _IconBtn extends StatelessWidget {
 // ─── UPI Selector Row ─────────────────────────────────────────────────────────
 class _UpiSelectorRow extends StatelessWidget {
   final UpiController c;
-  const _UpiSelectorRow({required this.c});
+  final GlobalKey? addBtnKey;
+  final GlobalKey? selectorKey;
+  const _UpiSelectorRow({required this.c, this.addBtnKey, this.selectorKey});
 
   @override
   Widget build(BuildContext context) {
@@ -691,6 +953,7 @@ class _UpiSelectorRow extends StatelessWidget {
       children: [
         Expanded(
           child: GestureDetector(
+            key: selectorKey,
             onTap: () => _showUpiSelector(context, c),
             child: Container(
               padding:
@@ -737,6 +1000,7 @@ class _UpiSelectorRow extends StatelessWidget {
         const SizedBox(width: 10),
         // Add UPI button
         GestureDetector(
+          key: addBtnKey,
           onTap: () => _showAddUpiSheet(context, c),
           child: Container(
             width: 52,
@@ -760,6 +1024,7 @@ class _QrCard extends StatelessWidget {
   final double amt, perPerson;
   final int sp;
   final NumberFormat fmt;
+  final GlobalKey? payNowKey;
 
   const _QrCard({
     required this.c,
@@ -768,6 +1033,7 @@ class _QrCard extends StatelessWidget {
     required this.sp,
     required this.perPerson,
     required this.fmt,
+    this.payNowKey,
   });
 
   @override
@@ -792,7 +1058,7 @@ class _QrCard extends StatelessWidget {
               offset: const Offset(0, 4))
         ],
       ),
-      child: upiDetails != null ? _ActiveQr(c: c, upiDetails: upiDetails!, amt: amt, sp: sp, perPerson: perPerson, fmt: fmt)
+      child: upiDetails != null ? _ActiveQr(c: c, upiDetails: upiDetails!, amt: amt, sp: sp, perPerson: perPerson, fmt: fmt, payNowKey: payNowKey)
                                 : const _EmptyQr(),
     );
   }
@@ -860,6 +1126,7 @@ class _ActiveQr extends StatelessWidget {
   final double amt, perPerson;
   final int sp;
   final NumberFormat fmt;
+  final GlobalKey? payNowKey;
 
   const _ActiveQr({
     required this.c,
@@ -868,6 +1135,7 @@ class _ActiveQr extends StatelessWidget {
     required this.sp,
     required this.perPerson,
     required this.fmt,
+    this.payNowKey,
   });
 
   @override
@@ -965,6 +1233,7 @@ class _ActiveQr extends StatelessWidget {
             const SizedBox(height: 16),
             // Pay Now button
             GestureDetector(
+              key: payNowKey,
               onTap: () => _launchUpiPayment(
                 context: context,
                 upiId: upiDetails.upiID,
@@ -1167,7 +1436,8 @@ class _InputCard extends StatelessWidget {
 // ─── Quick Amount Chips ───────────────────────────────────────────────────────
 class _QuickAmounts extends StatelessWidget {
   final UpiController c;
-  const _QuickAmounts({required this.c});
+  final GlobalKey? chipKey;
+  const _QuickAmounts({required this.c, this.chipKey});
 
   static const amounts = [100.0, 500.0, 1000.0, 2000.0, 5000.0];
 
@@ -1182,6 +1452,7 @@ class _QuickAmounts extends StatelessWidget {
     final _divider = theme.dividerColor;
 
     return SingleChildScrollView(
+      key: chipKey,
       scrollDirection: Axis.horizontal,
       child: Row(
         children: amounts
@@ -1425,8 +1696,26 @@ void _showAddUpiSheet(BuildContext context, UpiController c,
   final nameCtrl =
       TextEditingController(text: editUpi != null ? editUpi['name'] : '');
   final isEdit = editUpi != null;
+
+  // Keys for Add Sheet tour
+  final _upiFieldKey = GlobalKey();
+  final _scanBtnKey = GlobalKey();
+  final _nameFieldKey = GlobalKey();
+
   Get.bottomSheet(
-    Padding(
+    Builder(builder: (sheetContext) {
+      // Trigger tour after sheet is rendered (only for Add, not Edit)
+      if (!isEdit) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showAddSheetTour(
+            sheetContext,
+            upiFieldKey: _upiFieldKey,
+            scanBtnKey: _scanBtnKey,
+            nameFieldKey: _nameFieldKey,
+          );
+        });
+      }
+      return Padding(
       padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
@@ -1474,6 +1763,7 @@ void _showAddUpiSheet(BuildContext context, UpiController c,
               children: [
                 Expanded(
                   child: _SheetField(
+                    key: _upiFieldKey,
                     controller: upiCtrl,
                     hint: 'UPI ID (e.g., user@bank)',
                     prefixIcon: Icons.alternate_email_rounded,
@@ -1481,6 +1771,7 @@ void _showAddUpiSheet(BuildContext context, UpiController c,
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
+                  key: _scanBtnKey,
                   onTap: () async {
                     final result = await Navigator.of(context).push<UpiScanResult>(
                       MaterialPageRoute(
@@ -1509,6 +1800,7 @@ void _showAddUpiSheet(BuildContext context, UpiController c,
             const SizedBox(height: 12),
             // Name field
             _SheetField(
+              key: _nameFieldKey,
               controller: nameCtrl,
               hint: 'Display Name (e.g., Personal, Business)',
               prefixIcon: Icons.person_outline_rounded,
@@ -1573,7 +1865,8 @@ void _showAddUpiSheet(BuildContext context, UpiController c,
           ],
         ),
       ),
-    ),
+    );
+    }),   // closes Builder
     isScrollControlled: true,
   );
 }
@@ -1584,6 +1877,7 @@ class _SheetField extends StatelessWidget {
   final IconData prefixIcon;
 
   const _SheetField({
+    super.key,
     required this.controller,
     required this.hint,
     required this.prefixIcon,
@@ -1892,4 +2186,207 @@ class _AppFooter extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─── Tour Tooltip Widget ──────────────────────────────────────────────────────
+class _TourTooltip extends StatelessWidget {
+  final String title;
+  final String body;
+  final Color accent;
+  final VoidCallback onNext;
+  final VoidCallback onSkip;
+
+  const _TourTooltip({
+    required this.title,
+    required this.body,
+    required this.accent,
+    required this.onNext,
+    required this.onSkip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 6,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1A1A2E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Text(
+              body,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: const Color(0xFF888888),
+                height: 1.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              GestureDetector(
+                onTap: onSkip,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text(
+                    'Skip',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: const Color(0xFF888888),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onNext,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Next →',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Add UPI Sheet Tour ───────────────────────────────────────────────────────
+void _showAddSheetTour(
+  BuildContext context, {
+  required GlobalKey upiFieldKey,
+  required GlobalKey scanBtnKey,
+  required GlobalKey nameFieldKey,
+}) {
+  final svc = OnboardingService.instance;
+  if (!svc.shouldShowAddSheetTour) return;
+
+  final accent = Theme.of(context).colorScheme.secondary;
+  final primary = Theme.of(context).colorScheme.primary;
+
+  // Small delay so sheet is fully rendered
+  Future.delayed(const Duration(milliseconds: 400), () {
+    if (!context.mounted) return;
+
+    TutorialCoachMark(
+      targets: [
+        TargetFocus(
+          identify: 'upi_field',
+          keyTarget: upiFieldKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 12,
+          contents: [
+            TargetContent(
+              align: ContentAlign.bottom,
+              builder: (ctx, ctrl) => _TourTooltip(
+                title: 'Enter UPI ID',
+                body: 'Type the UPI ID — like name@okicici or 9876543210@ybl.',
+                accent: accent,
+                onNext: ctrl.next,
+                onSkip: ctrl.skip,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'scan_btn',
+          keyTarget: scanBtnKey,
+          shape: ShapeLightFocus.Circle,
+          radius: 12,
+          contents: [
+            TargetContent(
+              align: ContentAlign.bottom,
+              builder: (ctx, ctrl) => _TourTooltip(
+                title: 'Scan Their QR',
+                body: 'Or scan their QR code — camera opens and fills the UPI ID automatically.',
+                accent: accent,
+                onNext: ctrl.next,
+                onSkip: ctrl.skip,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'name_field',
+          keyTarget: nameFieldKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 12,
+          contents: [
+            TargetContent(
+              align: ContentAlign.top,
+              builder: (ctx, ctrl) => _TourTooltip(
+                title: 'Give Them a Name',
+                body: 'Milkman, Ramesh, Papa — pick a name so you recognise them instantly.',
+                accent: accent,
+                onNext: ctrl.next,
+                onSkip: ctrl.skip,
+              ),
+            ),
+          ],
+        ),
+      ],
+      colorShadow: primary,
+      opacityShadow: 0.82,
+      textSkip: 'SKIP',
+      paddingFocus: 10,
+      onFinish: () => svc.markAddSheetDone(),
+      onSkip: () {
+        svc.markAddSheetDone();
+        return true;
+      },
+    ).show(context: context);
+  });
 }
